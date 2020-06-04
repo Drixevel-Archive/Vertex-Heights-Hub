@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Updates"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 /*****************************/
@@ -119,6 +119,8 @@ public void onParsePlugins(Database db, DBResultSet results, const char[] error,
 		}
 		else if (StrEqual(sType, "gamedata", false))
 			FormatEx(sCheck, sizeof(sCheck), "%s.txt", sName);
+		else if (StrEqual(sType, "translation", false))
+			FormatEx(sCheck, sizeof(sCheck), "%s.txt", sName);
 
 		RequestUpdate(sType, sCheck);
 	}
@@ -132,6 +134,8 @@ void RequestUpdate(const char[] type, const char[] file)
 		FormatEx(sURL, sizeof(sURL), "https://vertexheights.com/hub/updates/plugins/%s", file);
 	else if (StrEqual(type, "gamedata", false))
 		FormatEx(sURL, sizeof(sURL), "https://vertexheights.com/hub/updates/gamedata/%s", file);
+	else if (StrEqual(type, "translation", false))
+		FormatEx(sURL, sizeof(sURL), "https://vertexheights.com/hub/updates/translations/%s", file);
 
 	System2HTTPRequest httpRequest = new System2HTTPRequest(HttpResponseCallback, sURL);
 	httpRequest.SetProgressCallback(HttpProgressCallback);
@@ -141,6 +145,8 @@ void RequestUpdate(const char[] type, const char[] file)
 		httpRequest.SetOutputFile("addons/sourcemod/plugins/%s", file);
 	else if (StrEqual(type, "gamedata", false))
 		httpRequest.SetOutputFile("addons/sourcemod/gamedata/%s", file);
+	else if (StrEqual(type, "translation", false))
+		httpRequest.SetOutputFile("addons/sourcemod/translations/%s", file);
 
 	httpRequest.GET();
 }

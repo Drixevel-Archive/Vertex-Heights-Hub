@@ -408,9 +408,9 @@ void GenerateSnow()
 
 void SetCorrection(const char[] file)
 {
-	int ent = -1;
-	while ((ent = FindEntityByClassname(ent, "color_correction")) != -1)
-		AcceptEntityInput(ent, "Kill");
+	int entity = -1;
+	while ((entity = FindEntityByClassname(entity, "color_correction")) != -1)
+		AcceptEntityInput(entity, "Kill");
 	
 	int correction = CreateEntityByName("color_correction");
 		
@@ -524,16 +524,16 @@ bool GetGameSoundSample(const char[] gameSound, char[] sample, int maxlength)
 
 void ApplySoundscape(const char[] mapSoundscapeInside, const char[] mapSoundscapeOutside)
 {
-	int ent = -1;
+	int entity = -1;
 	int proxy = -1;
 	int scape = -1;
 
 	float org[3];
 	char target[32];
 	
-	while ((ent = FindEntityByClassname(ent, "env_soundscape_proxy")) != -1)
+	while ((entity = FindEntityByClassname(entity, "env_soundscape_proxy")) != -1)
 	{
-        proxy = GetEntDataEnt2(ent, FindDataMapInfo(ent, "m_hProxySoundscape"));
+        proxy = GetEntDataEnt2(entity, FindDataMapInfo(entity, "m_hProxySoundscape"));
         
         if (proxy != -1)
 		{
@@ -545,10 +545,10 @@ void ApplySoundscape(const char[] mapSoundscapeInside, const char[] mapSoundscap
 
                 if (IsValidEntity(scape))
 				{
-                    GetEntPropVector(ent, Prop_Data, "m_vecOrigin", org);
+                    GetEntPropVector(entity, Prop_Data, "m_vecOrigin", org);
                     TeleportEntity(scape, org, NULL_VECTOR, NULL_VECTOR);
                     
-                    DispatchKeyValueFloat(scape, "radius", GetEntDataFloat(ent, FindDataMapInfo(ent, "m_flRadius")));
+                    DispatchKeyValueFloat(scape, "radius", GetEntDataFloat(entity, FindDataMapInfo(entity, "m_flRadius")));
                     
                     if ((StrContains(target, "inside", false) != -1) || (StrContains(target, "indoor", false) != -1))
 					{
@@ -566,12 +566,12 @@ void ApplySoundscape(const char[] mapSoundscapeInside, const char[] mapSoundscap
             }
         }
         
-        AcceptEntityInput(ent, "Kill");
+        AcceptEntityInput(entity, "Kill");
     }
     
-	while ((ent = FindEntityByClassname(ent, "env_soundscape")) != -1)
+	while ((entity = FindEntityByClassname(entity, "env_soundscape")) != -1)
 	{
-        GetEntPropString(ent, Prop_Data, "m_iName", target, sizeof(target));
+        GetEntPropString(entity, Prop_Data, "m_iName", target, sizeof(target));
         
         if (!StrEqual(target, mapSoundscapeInside) && !StrEqual(target, mapSoundscapeOutside))
 		{
@@ -579,10 +579,10 @@ void ApplySoundscape(const char[] mapSoundscapeInside, const char[] mapSoundscap
         
             if (IsValidEntity(scape))
 			{
-                GetEntPropVector(ent, Prop_Data, "m_vecOrigin", org);
+                GetEntPropVector(entity, Prop_Data, "m_vecOrigin", org);
                 TeleportEntity(scape, org, NULL_VECTOR, NULL_VECTOR);
                 
-                DispatchKeyValueFloat(scape, "radius", GetEntDataFloat(ent, FindDataMapInfo(ent, "m_flRadius")));
+                DispatchKeyValueFloat(scape, "radius", GetEntDataFloat(entity, FindDataMapInfo(entity, "m_flRadius")));
                 
                 if ((StrContains(target, "inside", false) != -1) || (StrContains(target, "indoor", false) != -1))
 				{
@@ -598,7 +598,7 @@ void ApplySoundscape(const char[] mapSoundscapeInside, const char[] mapSoundscap
                 DispatchSpawn(scape);
             }
         
-            AcceptEntityInput(ent, "Kill");
+            AcceptEntityInput(entity, "Kill");
         }
     }
 }

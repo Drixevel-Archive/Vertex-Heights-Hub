@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Core"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 /*****************************/
@@ -23,16 +23,14 @@
 
 #include <vertexheights>
 #include <vh-core>
-/*#include <vh-bans>
+#include <vh-bans>
 #include <vh-permissions>
 #include <vh-logs>
 #include <vh-levels>
-#include <vh-store>*/
+#include <vh-store>
 
 /*****************************/
 //ConVars
-
-ConVar convar_Hostname;
 
 /*****************************/
 //Globals
@@ -91,8 +89,6 @@ public void OnPluginStart()
 {
 	Database.Connect(onSQLConnect, "default");
 
-	convar_Hostname = FindConVar("hostname");
-
 	RegConsoleCmd("sm_vertex", Command_Vertex, "Open the Vertex hub menu.");
 	RegConsoleCmd("sm_vid", Command_VID, "Prints out your Vertex ID or another players Vertex ID.");
 	RegConsoleCmd("sm_whois", Command_Whois, "Shows details pertaining to a specific player.");
@@ -101,7 +97,7 @@ public void OnPluginStart()
 	
 	RegAdminCmd("sm_resyncall", Command_ResyncAll, ADMFLAG_ROOT, "Resync all players and their data.");
 
-	SteamWorks_SetGameDescription("~:Vertex Heights:~");
+	SteamWorks_SetGameDescription("Vertex Heights");
 }
 
 public Action Command_Connect(int client, int args)
@@ -337,10 +333,6 @@ public void VH_OnParseServerData(int serverid, const char[] gamemode, const char
 
 	if (strlen(mode) == 0)
 		strcopy(mode, sizeof(mode), "Team Fortress 2");
-	
-	char sHostname[256];
-	FormatEx(sHostname, sizeof(sHostname), ":~: Vertex Heights [%i] :~: - %s [%s]", serverid, mode, region);
-	convar_Hostname.SetString(sHostname, false, false);
 
 	GetRandomString(g_Server.secret_key, sizeof(g_Server.secret_key), sizeof(g_Server.secret_key));
 

@@ -33,7 +33,7 @@ enum struct Objectives
 	char map[64];
 }
 
-Objectives g_Objectives[MAXPLAYERS + 1][4];
+//Objectives g_Objectives[MAXPLAYERS + 1][4];
 int g_GenerateObjs[MAXPLAYERS + 1] = {-1, ...};
 
 /*****************************/
@@ -90,5 +90,8 @@ public int MenuAction_Void(Menu menu, MenuAction action, int param1, int param2)
 
 void GenerateObjectives(int client, int time)
 {
-	
+	if (client > 0 && time > 0)
+	{
+
+	}
 }

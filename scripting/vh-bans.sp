@@ -596,8 +596,8 @@ void OpenReportMenu(int client, int vid = VH_NULLID, const char[] name = "")
 	FormatEx(buffer, sizeof(buffer), "Type: %s", sType);
 	menu.AddItem("type", buffer);
 
-	FormatEx(buffer, sizeof(buffer), "Reason: %s", strlen(g_Report[client].reason) > 0 ? g_Report[client].reason : "N/A");
-	menu.AddItem("reason", buffer);
+	//FormatEx(buffer, sizeof(buffer), "Reason: %s", strlen(g_Report[client].reason) > 0 ? g_Report[client].reason : "N/A");
+	//menu.AddItem("reason", buffer);
 
 	char sLength[32];
 	switch (g_Report[client].length)

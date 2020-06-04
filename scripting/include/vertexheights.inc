@@ -3,8 +3,8 @@
 #endif
 #define __vertexheights_included
 
-#define TAG "~:[VH]"
-#define CHAT_TAG "{blueviolet}~{fuchsia}:{darkorchid}[{honeydew}VH{darkorchid}]{whitesmoke}"
+#define TAG "[Vertex]"
+#define CHAT_TAG "{darkorchid}[{honeydew}Vertex{darkorchid}]{whitesmoke}"
 
 stock void Vertex_SendPrint(int client, const char[] format, any ...)
 {

@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Store"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.3"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 #define TYPE_SHOP 1
@@ -553,6 +553,31 @@ public void onSaveEquipped(Database db, DBResultSet results, const char[] error,
 		ThrowError("Error while saving equipped: %s", error);
 }
 
+int g_TotalMarketItems;
+enum struct Marketplace
+{
+	char name[64];
+	int credits;
+	int available;
+
+	void Init()
+	{
+		this.name[0] = '\0';
+		this.credits = 0;
+		this.available = 0;
+	}
+
+	void AddMarketplaceItem(const char[] name, int credits, int available)
+	{
+		strcopy(this.name, 64, name);
+		this.credits = credits;
+		this.available = available;
+		g_TotalMarketItems++;
+	}
+}
+
+Marketplace g_Marketplace[256];
+
 /*****************************/
 //Plugin Info
 public Plugin myinfo = 
@@ -601,6 +626,8 @@ public void OnPluginStart()
 	RegConsoleCmd("sm_store", Command_Store, "Open the store menu to access store features.");
 	RegConsoleCmd("sm_shop", Command_Shop, "Access the items shop to purchase new items.");
 	RegConsoleCmd("sm_inventory", Command_Inventory, "Access your inventory to equip, refund, sell, gift and auction items.");
+	RegConsoleCmd("sm_loadouts", Command_Loadouts, "Create loadouts for items to equip and unequip multiple items at once.");
+	RegConsoleCmd("sm_marketplace", Command_Marketplace, "Access and purchase available TF2 marketplace items.");
 	RegConsoleCmd("sm_credits", Command_Credits, "Displays your credits or a targets credits in chat.");
 
 	RegAdminCmd("sm_setcredits", Command_SetCredits, ADMFLAG_ROOT);
@@ -611,12 +638,14 @@ public void OnPluginStart()
 
 	RegAdminCmd("sm_reloadcategories", Command_ReloadCategories, ADMFLAG_ROOT);
 	RegAdminCmd("sm_reloaditems", Command_ReloadItems, ADMFLAG_ROOT);
+	RegAdminCmd("sm_reloadmarketplace", Command_ReloadMarketplace, ADMFLAG_ROOT);
 
 	for (int i = 1; i <= MaxClients; i++)
 		if (IsClientConnected(i))
 			OnClientConnected(i);
 	
 	CreateTimer(300.0, Timer_GiveCredits, _, TIMER_REPEAT);
+	CreateTimer(3600.0, Timer_ParseMarketplace, _, TIMER_REPEAT);
 }
 
 public Action Timer_GiveCredits(Handle timer)
@@ -648,6 +677,7 @@ public void onSQLConnect(Database db, const char[] error, any data)
 
 	ParseCategories();
 	ParseItems();
+	ParseMarketplaceItems();
 
 	for (int i = 1; i <= MaxClients; i++)
 		if (VH_GetVertexID(i) != VH_NULLID)
@@ -679,7 +709,7 @@ public void onParseCategories(Database db, DBResultSet results, const char[] err
 		g_TotalCategories++;
 	}
 
-	PrintToChatAll("%i categories are now available.", g_TotalCategories);
+	Vertex_SendPrintToAll("%i categories are now available.", g_TotalCategories);
 }
 
 void ParseItems()
@@ -710,7 +740,7 @@ public void onParseItems(Database db, DBResultSet results, const char[] error, a
 		g_TotalItems++;
 	}
 
-	PrintToChatAll("%i items are now available.", g_TotalItems);
+	Vertex_SendPrintToAll("%i items are now available.", g_TotalItems);
 }
 
 public void OnClientConnected(int client)
@@ -818,7 +848,8 @@ void OpenStoreMenu(int client)
 
 	menu.AddItem("shop", "Purchase Items");
 	menu.AddItem("inv", "Access your Inventory");
-	menu.AddItem("load", "Manage your Loadouts", ITEMDRAW_DISABLED);
+	menu.AddItem("load", "Manage your Loadouts");
+	menu.AddItem("market", "Access Available Marketplace Items");
 
 	menu.Display(client, MENU_TIME_FOREVER);
 }
@@ -840,6 +871,16 @@ public int MenuHandler_Store(Menu menu, MenuAction action, int param1, int param
 			else if (StrEqual(sInfo, "inv"))
 			{
 				if (!OpenInventoryMenu(param1))
+					OpenStoreMenu(param1);
+			}
+			else if (StrEqual(sInfo, "load"))
+			{
+				if (!OpenLoadoutsMenu(param1))
+					OpenStoreMenu(param1);
+			}
+			else if (StrEqual(sInfo, "market"))
+			{
+				if (!OpenMarketplaceMenu(param1))
 					OpenStoreMenu(param1);
 			}
 		}
@@ -1636,8 +1677,9 @@ public Action CP_OnChatMessage(int& author, ArrayList recipients, char[] flagstr
 			int index3 = -1;
 			if (namecolor[0] != -1)
 				index3 = GetItemIndexById(namecolor[0]);
+			if (index3 || index2) {}
 
-			Format(name, MAXLENGTH_NAME, "%s%s%s%s", (index2 != -1) ? g_Items[index2].data : "", g_Items[index].data, (index3 != -1) ? g_Items[index3].data : "", name);
+			//Format(name, MAXLENGTH_NAME, "%s%s%s%s", (index2 != -1) ? g_Items[index2].data : "", g_Items[index].data, (index3 != -1) ? g_Items[index3].data : "", name);
 			changed = true;
 		}
 	}
@@ -2264,4 +2306,131 @@ void TF2_GetWeaponNameFromIndex(int index, char[] buffer, int size)
 		case 15143: strcopy(buffer, size, "Blitzkrieg");
 		case 15144: strcopy(buffer, size, "Airwolf");
 	}
+}
+
+public Action Command_Loadouts(int client, int args)
+{
+	OpenLoadoutsMenu(client);
+	return Plugin_Handled;
+}
+
+bool OpenLoadoutsMenu(int client)
+{
+	Menu menu = new Menu(MenuHandler_Loadouts);
+	menu.SetTitle("::Vertex Heights :: Your Loadouts\n::Credits: %i", g_Player[client].credits);
+
+	menu.AddItem("manage", "Manage your Loadouts");
+	menu.AddItem("create", "Create a Loadout");
+
+	menu.ExitBackButton = true;
+	menu.Display(client, MENU_TIME_FOREVER);
+
+	return true;
+}
+
+public int MenuHandler_Loadouts(Menu menu, MenuAction action, int param1, int param2)
+{
+	switch (action)
+	{
+		case MenuAction_Select:
+		{
+			char sInfo[32];
+			menu.GetItem(param2, sInfo, sizeof(sInfo));
+
+			
+		}
+		case MenuAction_Cancel:
+			if (param2 == MenuCancel_ExitBack)
+				OpenStoreMenu(param1);
+		case MenuAction_End:
+			delete menu;
+	}
+}
+
+public Action Command_Marketplace(int client, int args)
+{
+	OpenMarketplaceMenu(client);
+	return Plugin_Handled;
+}
+
+bool OpenMarketplaceMenu(int client)
+{
+	Menu menu = new Menu(MenuHandler_Marketplace);
+	menu.SetTitle("::Vertex Heights :: Marketplace Items\n::Credits: %i", g_Player[client].credits);
+
+	char sDisplay[256];
+	for (int i = 0; i < g_TotalMarketItems; i++)
+	{
+		FormatEx(sDisplay, sizeof(sDisplay), "(%s) %s(%i)", g_Marketplace[i].available != 0 ? "Unlocked" : "Locked", g_Marketplace[i].name, g_Marketplace[i].credits);
+		menu.AddItem("", sDisplay, ITEMDRAW_DISABLED);
+	}
+
+	if (menu.ItemCount == 0)
+		menu.AddItem("", " :: No Marketplace Items Found", ITEMDRAW_DISABLED);
+
+	menu.ExitBackButton = true;
+	menu.Display(client, MENU_TIME_FOREVER);
+
+	return true;
+}
+
+public int MenuHandler_Marketplace(Menu menu, MenuAction action, int param1, int param2)
+{
+	switch (action)
+	{
+		case MenuAction_Select:
+		{
+			char sInfo[32];
+			menu.GetItem(param2, sInfo, sizeof(sInfo));
+
+			OpenMarketplaceMenu(param1);
+		}
+		case MenuAction_Cancel:
+			if (param2 == MenuCancel_ExitBack)
+				OpenStoreMenu(param1);
+		case MenuAction_End:
+			delete menu;
+	}
+}
+
+public Action Timer_ParseMarketplace(Handle timer)
+{
+	ParseMarketplaceItems();
+}
+
+public Action Command_ReloadMarketplace(int client, int args)
+{
+	ParseMarketplaceItems();
+	Vertex_SendPrint(client, "Marketplace items have been synced.");
+	return Plugin_Handled;
+}
+
+void ParseMarketplaceItems()
+{
+	for (int i = 0; i < g_TotalMarketItems; i++)
+		g_Marketplace[i].Init();
+	g_TotalMarketItems = 0;
+
+	char sQuery[256];
+	g_Database.Format(sQuery, sizeof(sQuery), "SELECT name, credits, available FROM `store_marketplace`;");
+	g_Database.Query(OnParseMarketplaceItems, sQuery);
+}
+
+public void OnParseMarketplaceItems(Database db, DBResultSet results, const char[] error, any data)
+{
+	if (results == null)
+		ThrowError("Error while parsing marketplace items: %s", error);
+	
+	char name[64]; int credits; int available;
+
+	while (results.FetchRow())
+	{
+		results.FetchString(0, name, sizeof(name));
+		TrimString(name);
+		credits = results.FetchInt(1);
+		available = results.FetchInt(2);
+		g_Marketplace[g_TotalMarketItems].AddMarketplaceItem(name, credits, available);
+	}
+
+	Vertex_SendPrintToAll("Available marketplace items have been updated.");
 }

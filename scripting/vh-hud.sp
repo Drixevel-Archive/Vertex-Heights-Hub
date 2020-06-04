@@ -27,7 +27,7 @@
 
 Handle g_Sync_Hud;
 
-int g_Setting_HudPosition;
+//int g_Setting_HudPosition;
 
 /*****************************/
 //Plugin Info
@@ -59,7 +59,7 @@ public void OnPluginStart()
 	for (int i = 1; i <= MaxClients; i++)
 		ShowLogo(i);
 	
-	g_Setting_HudPosition = VH_RegisterSetting("Hud Position", "hud_position", TYPE_VECTOR2D);
+	//g_Setting_HudPosition = VH_RegisterSetting("Hud Position", "hud_position", TYPE_VECTOR2D);
 }
 
 public void OnPluginEnd()

@@ -15,8 +15,10 @@
 /*****************************/
 //Includes
 #include <sourcemod>
+
 #include <misc-sm>
 #include <misc-colors>
+
 #include <json>
 #include <system2>
 #include <discord>

@@ -6,7 +6,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Tools"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.2"
+#define PLUGIN_VERSION "1.0.3"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 //Includes
@@ -17,6 +17,8 @@
 #include <misc-colors>
 #include <misc-tf>
 #include <misc-csgo>
+
+#include <vertexheights>
 
 #undef REQUIRE_EXTENSIONS
 #include <tf2items>
@@ -92,8 +94,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 public void OnPluginStart()
 {
 	LoadTranslations("common.phrases");
-	CSetPrefix("{lime}[Tools]");
-	
+
 	CreateConVar("sm_servertools_version", PLUGIN_VERSION, PLUGIN_DESCRIPTION, FCVAR_NOTIFY|FCVAR_DONTRECORD);
 	convar_Autoreload = CreateConVar("sm_servertools_autoreload", "1");
 	convar_DisableWaitingForPlayers = CreateConVar("sm_servertools_disable_waitingforplayers", "0");
@@ -372,16 +373,34 @@ public void OnAllPluginsLoaded()
 			EmitSoundToAll("ui/cyoa_map_open.wav");
 			ServerCommand("sm plugins reload %s", sReload);
 			
-			SendPrintAll("Plugin '{U}%s {D}' has been reloaded.", sName);
+			Vertex_SendPrintToAll("Plugin '[H]%s [D]' has been reloaded.", sName);
 			PrintToServer("Plugin '%s' has been reloaded.", sName);
 			
 			ServerCommand("sm_reload_translations %s", sReload); //Automatically reloads translations.
+
+			DataPack pack;
+			CreateDataTimer(0.5, Timer_CheckLoad, pack, TIMER_FLAG_NO_MAPCHANGE);
+			pack.WriteCell(plugin);
+			pack.WriteString(sReload);
 		}
 
 		g_CachedTimes.SetValue(sFile, current);
 	}
 
 	delete iter;
+}
+
+public Action Timer_CheckLoad(Handle timer, DataPack pack)
+{
+	pack.Reset();
+
+	Handle plugin = pack.ReadCell();
+
+	char sReload[256];
+	pack.ReadString(sReload, sizeof(sReload));
+
+	if (plugin == null)
+		ServerCommand("sm plugins load %s", sReload);
 }
 
 public void OnMapStart()
@@ -443,65 +462,11 @@ public void OnClientDisconnect(int client)
 	g_TimerVal[client] = 0.0;
 }
 
-void SendPrintAll(char[] format, any ...)
-{
-	char sBuffer[255];
-	VFormat(sBuffer, sizeof(sBuffer), format, 2);
-	
-	char sChatColor[32]; char sUnique[32];
-	if (IsSource2009())
-	{
-		sChatColor = "{beige}";
-		sUnique = "{ancient}";
-	}
-	else
-	{
-		sChatColor = "{yellow}";
-		sUnique = "{lightred}";
-	}
-	
-	Format(sBuffer, sizeof(sBuffer), "%s%s", sChatColor, sBuffer);
-	ReplaceString(sBuffer, sizeof(sBuffer), "{U}", sUnique, false);
-	ReplaceString(sBuffer, sizeof(sBuffer), "{D}", "{default}", false);
-	
-	for (int i = 1; i <= MaxClients; i++)
-	{
-		if (!IsClientConnected(i) || !IsClientInGame(i) || IsFakeClient(i))
-			continue;
-		
-		CPrintToChat(i, sBuffer);
-	}
-}
-
-void SendPrint(int client, char[] format, any ...)
-{
-	char sBuffer[255];
-	VFormat(sBuffer, sizeof(sBuffer), format, 3);
-	
-	char sChatColor[32]; char sUnique[32];
-	if (IsSource2009())
-	{
-		sChatColor = "{beige}";
-		sUnique = "{ancient}";
-	}
-	else
-	{
-		sChatColor = "{yellow}";
-		sUnique = "{lightred}";
-	}
-	
-	Format(sBuffer, sizeof(sBuffer), "%s%s", sChatColor, sBuffer);
-	ReplaceString(sBuffer, sizeof(sBuffer), "{U}", sUnique, false);
-	ReplaceString(sBuffer, sizeof(sBuffer), "{D}", "{default}", false);
-	
-	CPrintToChat(client, sBuffer);
-}
-
 public Action Command_Tools(int client, int args)
 {
 	if (IsClientServer(client))
 	{
-		SendPrint(client, "You must be in-game to use this command.");
+		Vertex_SendPrint(client, "You must be in-game to use this command.");
 		return Plugin_Handled;
 	}
 
@@ -545,7 +510,7 @@ public void Confirm_Restart(int client, ConfirmationResponses response)
 {
 	if (response == Confirm_Yes)
 	{
-		SendPrint(client, "Restarting the server in {U}5 {D}seconds...");
+		Vertex_SendPrint(client, "Restarting the server in [H]5 [D]seconds...");
 		CreateTimer(5.0, Timer_Restart);
 	}
 }
@@ -565,7 +530,7 @@ public void Confirm_Quit(int client, ConfirmationResponses response)
 {
 	if (response == Confirm_Yes)
 	{
-		SendPrint(client, "Shutting down the server in {U}5 {D}seconds...");
+		Vertex_SendPrint(client, "Shutting down the server in [H]5 [D]seconds...");
 		CreateTimer(5.0, Timer_Quit);
 	}
 }
@@ -579,19 +544,19 @@ public Action Command_Teleport(int client, int args)
 {
 	if (IsClientServer(client))
 	{
-		SendPrint(client, "You must be in-game to use this command.");
+		Vertex_SendPrint(client, "You must be in-game to use this command.");
 		return Plugin_Handled;
 	}
 
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to teleport to.");
+		Vertex_SendPrint(client, "You must specify a target to teleport to.");
 		return Plugin_Handled;
 	}
 
 	if (!IsPlayerAlive(client))
 	{
-		SendPrint(client, "You must be alive to use this command.");
+		Vertex_SendPrint(client, "You must be alive to use this command.");
 		return Plugin_Handled;
 	}
 
@@ -602,13 +567,13 @@ public Action Command_Teleport(int client, int args)
 
 	if (!IsPlayerIndex(target) || !IsClientConnected(target) || !IsClientInGame(target))
 	{
-		SendPrint(client, "Invalid target specified, please try again.");
+		Vertex_SendPrint(client, "Invalid target specified, please try again.");
 		return Plugin_Handled;
 	}
 
 	if (!IsPlayerAlive(target))
 	{
-		SendPrint(client, "{U}%N {D} isn't currently alive.", target);
+		Vertex_SendPrint(client, "[H]%N [D]isn't currently alive.", target);
 		return Plugin_Handled;
 	}
 
@@ -620,8 +585,8 @@ public Action Command_Teleport(int client, int args)
 
 	TeleportEntity(client, vecOrigin, vecAngles, NULL_VECTOR);
 
-	SendPrint(target, "{U}%N {D} teleported themselves to you.", client);
-	SendPrint(client, "You have teleported yourself to {U}%N {D}.", target);
+	Vertex_SendPrint(target, "[H]%N [D]teleported themselves to you.", client);
+	Vertex_SendPrint(client, "You have teleported yourself to [H]%N [D].", target);
 
 	return Plugin_Handled;
 }
@@ -635,7 +600,7 @@ public Action Command_TeleportCoords(int client, int args)
 	
 	TeleportEntity(client, vecOrigin, NULL_VECTOR, NULL_VECTOR);
 
-	SendPrint(client, "You have teleported to coordinates: %.2f/%.2f/%.2f", vecOrigin[0], vecOrigin[1], vecOrigin[2]);
+	Vertex_SendPrint(client, "You have teleported to coordinates: %.2f/%.2f/%.2f", vecOrigin[0], vecOrigin[1], vecOrigin[2]);
 	return Plugin_Handled;
 }
 
@@ -643,19 +608,19 @@ public Action Command_Bring(int client, int args)
 {
 	if (IsClientServer(client))
 	{
-		SendPrint(client, "You must be in-game to use this command.");
+		Vertex_SendPrint(client, "You must be in-game to use this command.");
 		return Plugin_Handled;
 	}
 
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to bring.");
+		Vertex_SendPrint(client, "You must specify a target to bring.");
 		return Plugin_Handled;
 	}
 
 	if (!IsPlayerAlive(client))
 	{
-		SendPrint(client, "You must be alive to use this command.");
+		Vertex_SendPrint(client, "You must be alive to use this command.");
 		return Plugin_Handled;
 	}
 
@@ -683,13 +648,13 @@ public Action Command_Bring(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		TeleportEntity(targets_list[i], vecOrigin, vecAngles, NULL_VECTOR);
-		SendPrint(targets_list[i], "You have been teleported to {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "You have been teleported to [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have teleported {U}%t {D} to you.", sTargetName);
+		Vertex_SendPrint(client, "You have teleported [H]%t [D]to you.", sTargetName);
 	else
-		SendPrint(client, "You have teleported {U}%s {D} to you.", sTargetName);
+		Vertex_SendPrint(client, "You have teleported [H]%s [D]to you.", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -698,19 +663,19 @@ public Action Command_Port(int client, int args)
 {
 	if (IsClientServer(client))
 	{
-		SendPrint(client, "You must be in-game to use this command.");
+		Vertex_SendPrint(client, "You must be in-game to use this command.");
 		return Plugin_Handled;
 	}
 
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to port.");
+		Vertex_SendPrint(client, "You must specify a target to port.");
 		return Plugin_Handled;
 	}
 
 	if (!IsPlayerAlive(client))
 	{
-		SendPrint(client, "You must be alive to use this command.");
+		Vertex_SendPrint(client, "You must be alive to use this command.");
 		return Plugin_Handled;
 	}
 
@@ -721,7 +686,7 @@ public Action Command_Port(int client, int args)
 	char sTargetName[MAX_TARGET_LENGTH];
 	bool tn_is_ml;
 
-	int targets = ProcessTargetString(sTarget, client, targets_list, sizeof(targets_list), COMMAND_FILTER_ALIVE, sTargetName, sizeof(sTargetName), tn_is_ml);
+	int targets = ProcessTargetString(sTarget, client, targets_list, sizeof(targets_list), 0, sTargetName, sizeof(sTargetName), tn_is_ml);
 
 	if (targets <= 0)
 	{
@@ -734,14 +699,17 @@ public Action Command_Port(int client, int args)
 
 	for (int i = 0; i < targets; i++)
 	{
+		if (!IsPlayerAlive(targets_list[i]))
+			TF2_RespawnPlayer(targets_list[i]);
+		
 		TeleportEntity(targets_list[i], vecOrigin, NULL_VECTOR, NULL_VECTOR);
-		SendPrint(targets_list[i], "You have been ported by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "You have been ported by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have ported {U}%t {D} to your look position.", sTargetName);
+		Vertex_SendPrint(client, "You have ported [H]%t [D]to your look position.", sTargetName);
 	else
-		SendPrint(client, "You have ported {U}%s {D} to your look position.", sTargetName);
+		Vertex_SendPrint(client, "You have ported [H]%s [D]to your look position.", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -750,7 +718,7 @@ public Action Command_SetHealth(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set their health.");
+		Vertex_SendPrint(client, "You must specify a target to set their health.");
 		return Plugin_Handled;
 	}
 
@@ -780,13 +748,13 @@ public Action Command_SetHealth(int client, int args)
 		else
 			SetEntityHealth(targets_list[i], health);
 		
-		SendPrint(targets_list[i], "Your health has been set to {U}%i {D} by {U}%N {D}.", health, client);
+		Vertex_SendPrint(targets_list[i], "Your health has been set to [H]%i [D]by [H]%N [D].", health, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set the health of {U}%t {D} to {U}%i {D}.", sTargetName, health);
+		Vertex_SendPrint(client, "You have set the health of [H]%t [D]to [H]%i [D].", sTargetName, health);
 	else
-		SendPrint(client, "You have set the health of {U}%s {D} to {U}%i {D}.", sTargetName, health);
+		Vertex_SendPrint(client, "You have set the health of [H]%s [D]to [H]%i [D].", sTargetName, health);
 
 	return Plugin_Handled;
 }
@@ -795,7 +763,7 @@ public Action Command_AddHealth(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to add to their health.");
+		Vertex_SendPrint(client, "You must specify a target to add to their health.");
 		return Plugin_Handled;
 	}
 
@@ -825,13 +793,13 @@ public Action Command_AddHealth(int client, int args)
 		else
 			SetEntityHealth(targets_list[i], (GetClientHealth(targets_list[i]) + health));
 		
-		SendPrint(targets_list[i], "Your health has been increased by {U}%i {D} by {U}%N {D}.", health, client);
+		Vertex_SendPrint(targets_list[i], "Your health has been increased by [H]%i [D]by [H]%N [D].", health, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have increased the health of {U}%t {D} by {U}%i {D}.", sTargetName, health);
+		Vertex_SendPrint(client, "You have increased the health of [H]%t [D]by [H]%i [D].", sTargetName, health);
 	else
-		SendPrint(client, "You have increased the health of {U}%s {D} by {U}%i {D}.", sTargetName, health);
+		Vertex_SendPrint(client, "You have increased the health of [H]%s [D]by [H]%i [D].", sTargetName, health);
 
 	return Plugin_Handled;
 }
@@ -840,7 +808,7 @@ public Action Command_RemoveHealth(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to deduct from their health.");
+		Vertex_SendPrint(client, "You must specify a target to deduct from their health.");
 		return Plugin_Handled;
 	}
 
@@ -875,13 +843,13 @@ public Action Command_RemoveHealth(int client, int args)
 				SetEntityHealth(targets_list[i], (GetClientHealth(targets_list[i]) - health));
 		}
 		
-		SendPrint(targets_list[i], "Your health has been deducted by {U}%i {D} by {U}%N {D}.", health, client);
+		Vertex_SendPrint(targets_list[i], "Your health has been deducted by [H]%i [D]by [H]%N [D].", health, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have deducted health of {U}%t {D} by {U}%i {D}.", sTargetName, health);
+		Vertex_SendPrint(client, "You have deducted health of [H]%t [D]by [H]%i [D].", sTargetName, health);
 	else
-		SendPrint(client, "You have deducted health of {U}%s {D} by {U}%i {D}.", sTargetName, health);
+		Vertex_SendPrint(client, "You have deducted health of [H]%s [D]by [H]%i [D].", sTargetName, health);
 
 	return Plugin_Handled;
 }
@@ -891,7 +859,7 @@ public Action Command_SetArmor(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set their armor.");
+		Vertex_SendPrint(client, "You must specify a target to set their armor.");
 		return Plugin_Handled;
 	}
 
@@ -917,13 +885,13 @@ public Action Command_SetArmor(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		CSGO_SetClientArmor(targets_list[i], armor);
-		SendPrint(targets_list[i], "Your armor has been set to {U}%i {D} by {U}%N {D}.", armor, client);
+		Vertex_SendPrint(targets_list[i], "Your armor has been set to [H]%i [D]by [H]%N [D].", armor, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set the armor of {U}%t {D} to {U}%i {D}.", sTargetName, armor);
+		Vertex_SendPrint(client, "You have set the armor of [H]%t [D]to [H]%i [D].", sTargetName, armor);
 	else
-		SendPrint(client, "You have set the armor of {U}%s {D} to {U}%i {D}.", sTargetName, armor);
+		Vertex_SendPrint(client, "You have set the armor of [H]%s [D]to [H]%i [D].", sTargetName, armor);
 
 	return Plugin_Handled;
 }
@@ -932,7 +900,7 @@ public Action Command_AddArmor(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to add to their armor.");
+		Vertex_SendPrint(client, "You must specify a target to add to their armor.");
 		return Plugin_Handled;
 	}
 
@@ -958,13 +926,13 @@ public Action Command_AddArmor(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		CSGO_AddClientArmor(targets_list[i], armor);
-		SendPrint(targets_list[i], "Your armor has been increased by {U}%i {D} by {U}%N {D}.", armor, client);
+		Vertex_SendPrint(targets_list[i], "Your armor has been increased by [H]%i [D]by [H]%N [D].", armor, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have increased the armor of {U}%t {D} by {U}%i {D}.", sTargetName, armor);
+		Vertex_SendPrint(client, "You have increased the armor of [H]%t [D]by [H]%i [D].", sTargetName, armor);
 	else
-		SendPrint(client, "You have increased the armor of {U}%s {D} by {U}%i {D}.", sTargetName, armor);
+		Vertex_SendPrint(client, "You have increased the armor of [H]%s [D]by [H]%i [D].", sTargetName, armor);
 
 	return Plugin_Handled;
 }
@@ -973,7 +941,7 @@ public Action Command_RemoveArmor(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to deduct from their armor.");
+		Vertex_SendPrint(client, "You must specify a target to deduct from their armor.");
 		return Plugin_Handled;
 	}
 
@@ -999,13 +967,13 @@ public Action Command_RemoveArmor(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		CSGO_RemoveClientArmor(targets_list[i], armor);
-		SendPrint(targets_list[i], "Your armor has been deducted by {U}%i {D} by {U}%N {D}.", armor, client);
+		Vertex_SendPrint(targets_list[i], "Your armor has been deducted by [H]%i [D]by [H]%N [D].", armor, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have deducted armor of {U}%t {D} by {U}%i {D}.", sTargetName, armor);
+		Vertex_SendPrint(client, "You have deducted armor of [H]%t [D]by [H]%i [D].", sTargetName, armor);
 	else
-		SendPrint(client, "You have deducted armor of {U}%s {D} by {U}%i {D}.", sTargetName, armor);
+		Vertex_SendPrint(client, "You have deducted armor of [H]%s [D]by [H]%i [D].", sTargetName, armor);
 
 	return Plugin_Handled;
 }
@@ -1014,17 +982,17 @@ public Action Command_SetClass(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set their class.");
+		Vertex_SendPrint(client, "You must specify a target to set their class.");
 		return Plugin_Handled;
 	}
 	else if (args == 1)
 	{
-		SendPrint(client, "You must specify a class to set.");
+		Vertex_SendPrint(client, "You must specify a class to set.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -1049,7 +1017,7 @@ public Action Command_SetClass(int client, int args)
 
 	if (class == TFClass_Unknown)
 	{
-		SendPrint(client, "You have specified an invalid class.");
+		Vertex_SendPrint(client, "You have specified an invalid class.");
 		return Plugin_Handled;
 	}
 
@@ -1060,13 +1028,13 @@ public Action Command_SetClass(int client, int args)
 	{
 		TF2_SetPlayerClass(targets_list[i], class, false, true);
 		TF2_RegeneratePlayer(targets_list[i]);
-		SendPrint(targets_list[i], "Your class has been set to {U}%s {D} by {U}%N {D}.", sClassName, client);
+		Vertex_SendPrint(targets_list[i], "Your class has been set to [H]%s [D]by [H]%N [D].", sClassName, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set the class of {U}%t {D} to {U}%s {D}.", sTargetName, sClassName);
+		Vertex_SendPrint(client, "You have set the class of [H]%t [D]to [H]%s [D].", sTargetName, sClassName);
 	else
-		SendPrint(client, "You have set the class of {U}%s {D} to {U}%s {D}.", sTargetName, sClassName);
+		Vertex_SendPrint(client, "You have set the class of [H]%s [D]to [H]%s [D].", sTargetName, sClassName);
 
 	return Plugin_Handled;
 }
@@ -1075,12 +1043,12 @@ public Action Command_SetTeam(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set their team.");
+		Vertex_SendPrint(client, "You must specify a target to set their team.");
 		return Plugin_Handled;
 	}
 	else if (args == 1)
 	{
-		SendPrint(client, "You must specify a team to set.");
+		Vertex_SendPrint(client, "You must specify a team to set.");
 		return Plugin_Handled;
 	}
 
@@ -1105,7 +1073,7 @@ public Action Command_SetTeam(int client, int args)
 
 	if (team < 1 || team > 3)
 	{
-		SendPrint(client, "You have specified an invalid team.");
+		Vertex_SendPrint(client, "You have specified an invalid team.");
 		return Plugin_Handled;
 	}
 
@@ -1130,13 +1098,13 @@ public Action Command_SetTeam(int client, int args)
 			default: ChangeClientTeam(targets_list[i], team);
 		}
 		
-		SendPrint(targets_list[i], "Your team has been set to {U}%s {D}by {U}%N {D}.", sTeamName, client);
+		Vertex_SendPrint(targets_list[i], "Your team has been set to [H]%s [D]by [H]%N [D].", sTeamName, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set the team of {U}%t {D}to {U}%s {D}.", sTargetName, sTeamName);
+		Vertex_SendPrint(client, "You have set the team of [H]%t [D]to [H]%s [D].", sTargetName, sTeamName);
 	else
-		SendPrint(client, "You have set the team of {U}%s {D}to {U}%s {D}.", sTargetName, sTeamName);
+		Vertex_SendPrint(client, "You have set the team of [H]%s [D]to [H]%s [D].", sTargetName, sTeamName);
 
 	return Plugin_Handled;
 }
@@ -1151,7 +1119,7 @@ public Action Command_SwitchTeams(int client, int args)
 		ChangeClientTeam_Alive(i, GetClientTeam(i) == 2 ? 3 : 2);
 	}
 	
-	SendPrintAll("{U}%N {D}has switched both teams.", client);
+	Vertex_SendPrintToAll("[H]%N [D]has switched both teams.", client);
 	return Plugin_Handled;
 }
 
@@ -1159,7 +1127,7 @@ public Action Command_Respawn(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to respawn.");
+		Vertex_SendPrint(client, "You must specify a target to respawn.");
 		return Plugin_Handled;
 	}
 
@@ -1206,13 +1174,13 @@ public Action Command_Respawn(int client, int args)
 			}
 		}
 		
-		SendPrint(targets_list[i], "Your have been respawned by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your have been respawned by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have respawned {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have respawned [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have respawned {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have respawned [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -1221,12 +1189,12 @@ public Action Command_Regenerate(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to regenerate.");
+		Vertex_SendPrint(client, "You must specify a target to regenerate.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -1248,13 +1216,13 @@ public Action Command_Regenerate(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		TF2_RegeneratePlayer(targets_list[i]);
-		SendPrint(targets_list[i], "Your have been regenerated by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your have been regenerated by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have regenerated {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have regenerated [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have regenerated {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have regenerated [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -1263,7 +1231,7 @@ public Action Command_RefillWeapon(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to refill their ammunition.");
+		Vertex_SendPrint(client, "You must specify a target to refill their ammunition.");
 		return Plugin_Handled;
 	}
 
@@ -1297,13 +1265,13 @@ public Action Command_RefillWeapon(int client, int args)
 			}
 		}
 
-		SendPrint(targets_list[i], "Your weapons ammunitions have been refilled by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your weapons ammunitions have been refilled by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have refilled the ammunition ammo for {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have refilled the ammunition ammo for [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have refilled the ammunition ammo for {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have refilled the ammunition ammo for [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -1312,7 +1280,7 @@ public Action Command_RefillAmunition(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to refill their ammunition.");
+		Vertex_SendPrint(client, "You must specify a target to refill their ammunition.");
 		return Plugin_Handled;
 	}
 
@@ -1340,13 +1308,13 @@ public Action Command_RefillAmunition(int client, int args)
 				SetAmmo(targets_list[i], weapon2, g_iAmmo[weapon2]);
 		}
 
-		SendPrint(targets_list[i], "Your weapons ammunitions have been refilled by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your weapons ammunitions have been refilled by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have refilled the ammunition ammo for {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have refilled the ammunition ammo for [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have refilled the ammunition ammo for {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have refilled the ammunition ammo for [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -1355,7 +1323,7 @@ public Action Command_RefillClip(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to refill their clip.");
+		Vertex_SendPrint(client, "You must specify a target to refill their clip.");
 		return Plugin_Handled;
 	}
 
@@ -1383,13 +1351,13 @@ public Action Command_RefillClip(int client, int args)
 				SetClip(weapon2, g_iClip[weapon2]);
 		}
 
-		SendPrint(targets_list[i], "Your weapons clips have been refilled by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your weapons clips have been refilled by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have refilled the clip ammo for {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have refilled the clip ammo for [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have refilled the clip ammo for {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have refilled the clip ammo for [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -1430,7 +1398,7 @@ public void OnEntityDestroyed(int entity)
 	{
 		char classname[64];
 		GetEntityClassname(entity, classname, sizeof(classname));
-		SendPrintAll("[SpewEntities] -{U}%i {D}: {U}%s {D}({U}Destroyed{D})", entity, classname);
+		Vertex_SendPrintToAll("[SpewEntities] -[H]%i [D]: [H]%s [D]([H]Destroyed[D])", entity, classname);
 	}
 }
 
@@ -1438,7 +1406,7 @@ public Action Command_ManageBots(int client, int args)
 {
 	if (IsClientServer(client))
 	{
-		SendPrint(client, "You must be in-game to use this command.");
+		Vertex_SendPrint(client, "You must be in-game to use this command.");
 		return Plugin_Handled;
 	}
 
@@ -1472,7 +1440,7 @@ public int MenuHandler_ManageBots(Menu menu, MenuAction action, int param1, int 
 
 			if (StrEqual(sInfo, "spawn"))
 			{
-				SendPrintAll("{U}%N {D} has spawned a bot.", param1);
+				Vertex_SendPrintToAll("[H]%N [D]has spawned a bot.", param1);
 				ServerCommand("tf_bot_add");
 
 				OpenManageBotsMenu(param1);
@@ -1483,13 +1451,13 @@ public int MenuHandler_ManageBots(Menu menu, MenuAction action, int param1, int 
 
 				if (!IsPlayerIndex(target) || !IsFakeClient(target))
 				{
-					SendPrint(param1, "Please aim your crosshair at a valid bot.");
+					Vertex_SendPrint(param1, "Please aim your crosshair at a valid bot.");
 					OpenManageBotsMenu(param1);
 					return;
 				}
 
-				SendPrintAll("{U}%N {D} has kicked the bot {U}%N {D}.", param1, target);
-				ServerCommand("tf_bot_kick \"{U}%N {D}\"", target);
+				Vertex_SendPrintToAll("[H]%N [D]has kicked the bot [H]%N [D].", param1, target);
+				ServerCommand("tf_bot_kick \"[H]%N [D]\"", target);
 
 				OpenManageBotsMenu(param1);
 			}
@@ -1499,7 +1467,7 @@ public int MenuHandler_ManageBots(Menu menu, MenuAction action, int param1, int 
 
 				if (!IsPlayerIndex(target) || !IsFakeClient(target))
 				{
-					SendPrint(param1, "Please aim your crosshair at a valid bot.");
+					Vertex_SendPrint(param1, "Please aim your crosshair at a valid bot.");
 					OpenManageBotsMenu(param1);
 					return;
 				}
@@ -1512,7 +1480,7 @@ public int MenuHandler_ManageBots(Menu menu, MenuAction action, int param1, int 
 
 				if (!IsPlayerIndex(target) || !IsFakeClient(target))
 				{
-					SendPrint(param1, "Please aim your crosshair at a valid bot.");
+					Vertex_SendPrint(param1, "Please aim your crosshair at a valid bot.");
 					OpenManageBotsMenu(param1);
 					return;
 				}
@@ -1526,7 +1494,7 @@ public int MenuHandler_ManageBots(Menu menu, MenuAction action, int param1, int 
 				blind.SetBool(!blind.BoolValue);
 				SetConVarFlag(blind, true, FCVAR_CHEAT);
 
-				SendPrintAll("{U}%N {D} has toggled bot movement {U}%s {D}.", param1, !blind.BoolValue ? "on" : "off");
+				Vertex_SendPrintToAll("[H]%N [D]has toggled bot movement [H]%s [D].", param1, !blind.BoolValue ? "on" : "off");
 
 				OpenManageBotsMenu(param1);
 			}
@@ -1544,7 +1512,7 @@ public int MenuHandler_ManageBots(Menu menu, MenuAction action, int param1, int 
 void OpenSetBotClassMenu(int client, int target)
 {
 	Menu menu = new Menu(MenuHandler_SetBotClass);
-	menu.SetTitle("[Tools] Pick a class for {U}%N {D}:", target);
+	menu.SetTitle("[Tools] Pick a class for [H]%N [D]:", target);
 
 	menu.AddItem("1", "Scout");
 	menu.AddItem("3", "Soldier");
@@ -1576,7 +1544,7 @@ public int MenuHandler_SetBotClass(Menu menu, MenuAction action, int param1, int
 
 			if (!IsPlayerIndex(target) || !IsFakeClient(target))
 			{
-				SendPrint(param1, "Bot is no longer valid.");
+				Vertex_SendPrint(param1, "Bot is no longer valid.");
 				OpenManageBotsMenu(param1);
 				return;
 			}
@@ -1601,7 +1569,7 @@ public int MenuHandler_SetBotClass(Menu menu, MenuAction action, int param1, int
 void OpenSetBotTeamMenu(int client, int target)
 {
 	Menu menu = new Menu(MenuHandler_SetBotTeam);
-	menu.SetTitle("[Tools] Pick a team for {U}%N {D}:", target);
+	menu.SetTitle("[Tools] Pick a team for [H]%N [D]:", target);
 
 	menu.AddItem("2", "Red");
 	menu.AddItem("3", "Blue");
@@ -1626,7 +1594,7 @@ public int MenuHandler_SetBotTeam(Menu menu, MenuAction action, int param1, int 
 
 			if (!IsPlayerIndex(target) || !IsFakeClient(target))
 			{
-				SendPrint(param1, "Bot is no longer valid.");
+				Vertex_SendPrint(param1, "Bot is no longer valid.");
 				OpenManageBotsMenu(param1);
 				return;
 			}
@@ -1673,7 +1641,7 @@ public int MenuHandler_SetBotQuota(Menu menu, MenuAction action, int param1, int
 			char sInfo[12];
 			menu.GetItem(param2, sInfo, sizeof(sInfo));
 
-			ServerCommand("tf_bot_quota {U}%i {D}", StringToInt(sInfo));
+			ServerCommand("tf_bot_quota [H]%i [D]", StringToInt(sInfo));
 
 			OpenSetBotQuotaMenu(param1);
 		}
@@ -1702,12 +1670,12 @@ public Action Command_Password(int client, int args)
 	{
 		if (strlen(sPassword) == 0)
 		{
-			SendPrint(client, "No password is currently set on the server, it's unlocked.");
+			Vertex_SendPrint(client, "No password is currently set on the server, it's unlocked.");
 			return Plugin_Handled;
 		}
 
 		password.SetString("");
-		SendPrintAll("{U}%N {D} has removed the password unlocking the server.", client);
+		Vertex_SendPrintToAll("[H]%N [D]has removed the password unlocking the server.", client);
 
 		return Plugin_Handled;
 	}
@@ -1717,26 +1685,26 @@ public Action Command_Password(int client, int args)
 
 	if (strlen(sNewPassword) == 0)
 	{
-		SendPrint(client, "You must specify a password in order to set it.");
+		Vertex_SendPrint(client, "You must specify a password in order to set it.");
 		return Plugin_Handled;
 	}
 
 	if (strlen(sNewPassword) < 6)
 	{
-		SendPrint(client, "The new password requires more than or equal to 6 characters.");
+		Vertex_SendPrint(client, "The new password requires more than or equal to 6 characters.");
 		return Plugin_Handled;
 	}
 
 	if (strlen(sNewPassword) > 256)
 	{
-		SendPrint(client, "The new password requires less than or equal to 256 characters.");
+		Vertex_SendPrint(client, "The new password requires less than or equal to 256 characters.");
 		return Plugin_Handled;
 	}
 
 	password.SetString(sPassword);
 
-	SendPrintAll("{U}%N {D} has set a password on the server locking it.", client);
-	SendPrint(client, "You have set the server password locking it to {U}%s {D}.", sNewPassword);
+	Vertex_SendPrintToAll("[H]%N [D]has set a password on the server locking it.", client);
+	Vertex_SendPrint(client, "You have set the server password locking it to [H]%s [D].", sNewPassword);
 
 	return Plugin_Handled;
 }
@@ -1772,7 +1740,7 @@ public Action Command_EndRound(int client, int args)
 		}
 	}
 	
-	SendPrintAll("{U}%N {D} has ended the current round.", client);
+	Vertex_SendPrintToAll("[H]%N [D]has ended the current round.", client);
 	return Plugin_Handled;
 }
 
@@ -1780,17 +1748,17 @@ public Action Command_SetCondition(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to add a condition to.");
+		Vertex_SendPrint(client, "You must specify a target to add a condition to.");
 		return Plugin_Handled;
 	}
 	else if (args == 1)
 	{
-		SendPrint(client, "You must specify a condition to set.");
+		Vertex_SendPrint(client, "You must specify a condition to set.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -1815,7 +1783,7 @@ public Action Command_SetCondition(int client, int args)
 
 	if (view_as<int>(condition) < 0 || view_as<int>(condition) > 118)
 	{
-		SendPrint(client, "You have specified an invalid condition.");
+		Vertex_SendPrint(client, "You have specified an invalid condition.");
 		return Plugin_Handled;
 	}
 
@@ -1830,7 +1798,7 @@ public Action Command_SetCondition(int client, int args)
 
 		if (time < TFCondDuration_Infinite)
 		{
-			SendPrint(client, "You have specified an invalid time.");
+			Vertex_SendPrint(client, "You have specified an invalid time.");
 			return Plugin_Handled;
 		}
 	}
@@ -1838,13 +1806,13 @@ public Action Command_SetCondition(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		TF2_AddCondition(targets_list[i], condition, time, client);
-		SendPrint(targets_list[i], "Your have gained a new condition from {U}%N {D} for %.2f seconds.", client, time);
+		Vertex_SendPrint(targets_list[i], "Your have gained a new condition from [H]%N [D]for %.2f seconds.", client, time);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set a new condition on {U}%t {D} for %.2f seconds.", sTargetName, time);
+		Vertex_SendPrint(client, "You have set a new condition on [H]%t [D]for %.2f seconds.", sTargetName, time);
 	else
-		SendPrint(client, "You have set a new condition on {U}%s {D} for %.2f seconds.", sTargetName, time);
+		Vertex_SendPrint(client, "You have set a new condition on [H]%s [D]for %.2f seconds.", sTargetName, time);
 
 	return Plugin_Handled;
 }
@@ -1853,17 +1821,17 @@ public Action Command_RemoveCondition(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to remove a condition from.");
+		Vertex_SendPrint(client, "You must specify a target to remove a condition from.");
 		return Plugin_Handled;
 	}
 	else if (args == 1)
 	{
-		SendPrint(client, "You must specify a condition to remove.");
+		Vertex_SendPrint(client, "You must specify a condition to remove.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -1888,7 +1856,7 @@ public Action Command_RemoveCondition(int client, int args)
 
 	if (view_as<int>(condition) < 0 || view_as<int>(condition) > 118)
 	{
-		SendPrint(client, "You have specified an invalid condition.");
+		Vertex_SendPrint(client, "You have specified an invalid condition.");
 		return Plugin_Handled;
 	}
 
@@ -1898,13 +1866,13 @@ public Action Command_RemoveCondition(int client, int args)
 			continue;
 
 		TF2_RemoveCondition(targets_list[i], condition);
-		SendPrint(targets_list[i], "Your have been stripped of a condition by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your have been stripped of a condition by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have been stripped of a condition by {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have been stripped of a condition by [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have been stripped of a condition by {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have been stripped of a condition by [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -1913,12 +1881,12 @@ public Action Command_SpewConditions(int client, int args)
 {
 	if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 	
 	g_SpewConditions = !g_SpewConditions;
-	SendPrint(client, "Spew Conditions: {U}%s {D}", g_SpewConditions ? "ON" : "OFF");
+	Vertex_SendPrint(client, "Spew Conditions: [H]%s [D]", g_SpewConditions ? "ON" : "OFF");
 	return Plugin_Handled;
 }
 
@@ -1928,7 +1896,7 @@ public void TF2_OnConditionAdded(int client, TFCond condition)
 	{
 		char sCondition[32];
 		TF2_GetConditionName(condition, sCondition, sizeof(sCondition));
-		SendPrint(client, "[Condition Added] -: {U}%s {D}", sCondition);
+		Vertex_SendPrint(client, "[Condition Added] -: [H]%s [D]", sCondition);
 	}
 }
 
@@ -1938,7 +1906,7 @@ public void TF2_OnConditionRemoved(int client, TFCond condition)
 	{
 		char sCondition[32];
 		TF2_GetConditionName(condition, sCondition, sizeof(sCondition));
-		SendPrint(client, "[Condition Removed] -: {U}%s {D}", sCondition);
+		Vertex_SendPrint(client, "[Condition Removed] -: [H]%s [D]", sCondition);
 	}
 }
 
@@ -1946,12 +1914,12 @@ public Action Command_SetUbercharge(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set their ubercharge.");
+		Vertex_SendPrint(client, "You must specify a target to set their ubercharge.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -1980,13 +1948,13 @@ public Action Command_SetUbercharge(int client, int args)
 			continue;
 
 		TF2_SetUberLevel(targets_list[i], uber);
-		SendPrint(targets_list[i], "Your ubercharge has been set to %.2f by {U}%N {D}.", uber, client);
+		Vertex_SendPrint(targets_list[i], "Your ubercharge has been set to %.2f by [H]%N [D].", uber, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set the ubercharge of {U}%t {D} to %.2f.", sTargetName, uber);
+		Vertex_SendPrint(client, "You have set the ubercharge of [H]%t [D]to %.2f.", sTargetName, uber);
 	else
-		SendPrint(client, "You have set the ubercharge of {U}%s {D} to %.2f.", sTargetName, uber);
+		Vertex_SendPrint(client, "You have set the ubercharge of [H]%s [D]to %.2f.", sTargetName, uber);
 
 	return Plugin_Handled;
 }
@@ -1995,12 +1963,12 @@ public Action Command_AddUbercharge(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to add to their ubercharge.");
+		Vertex_SendPrint(client, "You must specify a target to add to their ubercharge.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -2029,13 +1997,13 @@ public Action Command_AddUbercharge(int client, int args)
 			continue;
 
 		TF2_AddUberLevel(targets_list[i], uber);
-		SendPrint(targets_list[i], "Your ubercharge has been increased by %.2f by {U}%N {D}.", uber, client);
+		Vertex_SendPrint(targets_list[i], "Your ubercharge has been increased by %.2f by [H]%N [D].", uber, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have increased the ubercharge of {U}%t {D} by %.2f.", sTargetName, uber);
+		Vertex_SendPrint(client, "You have increased the ubercharge of [H]%t [D]by %.2f.", sTargetName, uber);
 	else
-		SendPrint(client, "You have increased the ubercharge of {U}%s {D} by %.2f.", sTargetName, uber);
+		Vertex_SendPrint(client, "You have increased the ubercharge of [H]%s [D]by %.2f.", sTargetName, uber);
 
 	return Plugin_Handled;
 }
@@ -2044,12 +2012,12 @@ public Action Command_RemoveUbercharge(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to deduct from their ubercharge.");
+		Vertex_SendPrint(client, "You must specify a target to deduct from their ubercharge.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -2078,13 +2046,13 @@ public Action Command_RemoveUbercharge(int client, int args)
 			continue;
 
 		TF2_RemoveUberLevel(targets_list[i], uber);
-		SendPrint(targets_list[i], "Your ubercharge has been deducted by %.2f by {U}%N {D}.", uber, client);
+		Vertex_SendPrint(targets_list[i], "Your ubercharge has been deducted by %.2f by [H]%N [D].", uber, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have deducted ubercharge of {U}%t {D} by %.2f.", sTargetName, uber);
+		Vertex_SendPrint(client, "You have deducted ubercharge of [H]%t [D]by %.2f.", sTargetName, uber);
 	else
-		SendPrint(client, "You have deducted ubercharge of {U}%s {D} by %.2f.", sTargetName, uber);
+		Vertex_SendPrint(client, "You have deducted ubercharge of [H]%s [D]by %.2f.", sTargetName, uber);
 
 	return Plugin_Handled;
 }
@@ -2093,12 +2061,12 @@ public Action Command_SetMetal(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set their metal.");
+		Vertex_SendPrint(client, "You must specify a target to set their metal.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -2127,13 +2095,13 @@ public Action Command_SetMetal(int client, int args)
 			continue;
 
 		TF2_SetMetal(targets_list[i], metal);
-		SendPrint(targets_list[i], "Your metal has been set to {U}%i {D} by {U}%N {D}.", metal, client);
+		Vertex_SendPrint(targets_list[i], "Your metal has been set to [H]%i [D]by [H]%N [D].", metal, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set the metal of {U}%t {D} to {U}%i {D}.", sTargetName, metal);
+		Vertex_SendPrint(client, "You have set the metal of [H]%t [D]to [H]%i [D].", sTargetName, metal);
 	else
-		SendPrint(client, "You have set the metal of {U}%s {D} to {U}%i {D}.", sTargetName, metal);
+		Vertex_SendPrint(client, "You have set the metal of [H]%s [D]to [H]%i [D].", sTargetName, metal);
 
 	return Plugin_Handled;
 }
@@ -2142,12 +2110,12 @@ public Action Command_AddMetal(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to add to their metal.");
+		Vertex_SendPrint(client, "You must specify a target to add to their metal.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -2176,13 +2144,13 @@ public Action Command_AddMetal(int client, int args)
 			continue;
 
 		TF2_AddMetal(targets_list[i], metal);
-		SendPrint(targets_list[i], "Your metal has been increased by {U}%i {D} by {U}%N {D}.", metal, client);
+		Vertex_SendPrint(targets_list[i], "Your metal has been increased by [H]%i [D]by [H]%N [D].", metal, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have increased the metal of {U}%t {D} by {U}%i {D}.", sTargetName, metal);
+		Vertex_SendPrint(client, "You have increased the metal of [H]%t [D]by [H]%i [D].", sTargetName, metal);
 	else
-		SendPrint(client, "You have increased the metal of {U}%s {D} by {U}%i {D}.", sTargetName, metal);
+		Vertex_SendPrint(client, "You have increased the metal of [H]%s [D]by [H]%i [D].", sTargetName, metal);
 
 	return Plugin_Handled;
 }
@@ -2191,12 +2159,12 @@ public Action Command_RemoveMetal(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to deduct from their metal.");
+		Vertex_SendPrint(client, "You must specify a target to deduct from their metal.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -2225,13 +2193,13 @@ public Action Command_RemoveMetal(int client, int args)
 			continue;
 
 		TF2_RemoveMetal(targets_list[i], metal);
-		SendPrint(targets_list[i], "Your metal has been deducted by {U}%i {D} by {U}%N {D}.", metal, client);
+		Vertex_SendPrint(targets_list[i], "Your metal has been deducted by [H]%i [D]by [H]%N [D].", metal, client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have deducted metal of {U}%t {D} by {U}%i {D}.", sTargetName, metal);
+		Vertex_SendPrint(client, "You have deducted metal of [H]%t [D]by [H]%i [D].", sTargetName, metal);
 	else
-		SendPrint(client, "You have deducted metal of {U}%s {D} by {U}%i {D}.", sTargetName, metal);
+		Vertex_SendPrint(client, "You have deducted metal of [H]%s [D]by [H]%i [D].", sTargetName, metal);
 
 	return Plugin_Handled;
 }
@@ -2240,12 +2208,12 @@ public Action Command_GetMetal(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to see their metal amount.");
+		Vertex_SendPrint(client, "You must specify a target to see their metal amount.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 	
@@ -2253,17 +2221,17 @@ public Action Command_GetMetal(int client, int args)
 	
 	if (target == -1)
 	{
-		SendPrint(client, "Target not found, please try again.");
+		Vertex_SendPrint(client, "Target not found, please try again.");
 		return Plugin_Handled;
 	}
 	
 	if (TF2_GetPlayerClass(target) != TFClass_Engineer)
 	{
-		SendPrint(client, "{U}%N {D}is not an engineer.", target);
+		Vertex_SendPrint(client, "[H]%N [D]is not an engineer.", target);
 		return Plugin_Handled;
 	}
 
-	SendPrint(client, "{U}%N{D}'s metal amount is: {U}%i{D}", target, TF2_GetMetal(target));
+	Vertex_SendPrint(client, "[H]%N[D]'s metal amount is: [H]%i[D]", target, TF2_GetMetal(target));
 	
 	return Plugin_Handled;
 }
@@ -2272,7 +2240,7 @@ public Action Command_SetTime(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a time to set.");
+		Vertex_SendPrint(client, "You must specify a time to set.");
 		return Plugin_Handled;
 	}
 
@@ -2290,26 +2258,25 @@ public Action Command_SetTime(int client, int args)
 	else
 	{
 		ConVar timelimit = FindConVar("mp_timelimit");
-		SetConVarFloat(timelimit, StringToFloat(sTime) / 60);
+		SetConVarFloat(timelimit, float(time) / 60);
 		delete timelimit;
 	}
 
-	SendPrintAll("{U}%N {D} has set the time to {U}%i {D}.", client, time);
+	Vertex_SendPrintToAll("[H]%N [D]has set the time to [H]%i [D].", client, time);
 
 	return Plugin_Handled;
 }
 
 public Action Command_AddTime(int client, int args)
 {
-	if (args == 0)
-	{
-		SendPrint(client, "You must specify a time to add to it.");
-		return Plugin_Handled;
-	}
+	int time = 999999;
 
-	char sTime[12];
-	GetCmdArg(1, sTime, sizeof(sTime));
-	int time = StringToInt(sTime);
+	if (args > 0)
+	{
+		char sTime[12];
+		GetCmdArg(1, sTime, sizeof(sTime));
+		time = StringToInt(sTime);
+	}
 
 	int entity = FindEntityByClassname(-1, "team_round_timer");
 
@@ -2321,7 +2288,7 @@ public Action Command_AddTime(int client, int args)
 		if (strncmp(sMap, "pl_", 3) == 0)
 		{
 			char sBuffer[32];
-			Format(sBuffer, sizeof(sBuffer), "0 {U}%i {D}", time);
+			Format(sBuffer, sizeof(sBuffer), "0 [H]%i [D]", time);
 
 			SetVariantString(sBuffer);
 			AcceptEntityInput(entity, "AddTeamTime");
@@ -2335,11 +2302,11 @@ public Action Command_AddTime(int client, int args)
 	else
 	{
 		ConVar timelimit = FindConVar("mp_timelimit");
-		SetConVarFloat(timelimit, timelimit.FloatValue + (StringToFloat(sTime) / 60));
+		SetConVarFloat(timelimit, timelimit.FloatValue + (float(time) / 60));
 		delete timelimit;
 	}
 
-	SendPrintAll("{U}%N {D} has added time to {U}%i {D}.", client, time);
+	Vertex_SendPrintToAll("[H]%N [D]has added time to [H]%i [D].", client, time);
 
 	return Plugin_Handled;
 }
@@ -2348,7 +2315,7 @@ public Action Command_RemoveTime(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a time to removed from.");
+		Vertex_SendPrint(client, "You must specify a time to removed from.");
 		return Plugin_Handled;
 	}
 
@@ -2366,7 +2333,7 @@ public Action Command_RemoveTime(int client, int args)
 		if (strncmp(sMap, "pl_", 3) == 0)
 		{
 			char sBuffer[32];
-			Format(sBuffer, sizeof(sBuffer), "0 {U}%i {D}", time);
+			Format(sBuffer, sizeof(sBuffer), "0 [H]%i [D]", time);
 
 			SetVariantString(sBuffer);
 			AcceptEntityInput(entity, "RemoveTeamTime");
@@ -2384,7 +2351,7 @@ public Action Command_RemoveTime(int client, int args)
 		delete timelimit;
 	}
 
-	SendPrintAll("{U}%N {D} has removed time from {U}%i {D}.", client, time);
+	Vertex_SendPrintToAll("[H]%N [D]has removed time from [H]%i [D].", client, time);
 
 	return Plugin_Handled;
 }
@@ -2393,12 +2360,12 @@ public Action Command_SetCrits(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set crits on.");
+		Vertex_SendPrint(client, "You must specify a target to set crits on.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -2428,7 +2395,7 @@ public Action Command_SetCrits(int client, int args)
 
 		if (time < TFCondDuration_Infinite)
 		{
-			SendPrint(client, "You have specified an invalid time.");
+			Vertex_SendPrint(client, "You have specified an invalid time.");
 			return Plugin_Handled;
 		}
 	}
@@ -2436,13 +2403,13 @@ public Action Command_SetCrits(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		TF2_AddCondition(targets_list[i], TFCond_CritOnWin, time, client);
-		SendPrint(targets_list[i], "Your have gained crits from {U}%N {D} for %.2f seconds.", client, time);
+		Vertex_SendPrint(targets_list[i], "Your have gained crits from [H]%N [D]for %.2f seconds.", client, time);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set crits on {U}%t {D} for %.2f seconds.", sTargetName, time);
+		Vertex_SendPrint(client, "You have set crits on [H]%t [D]for %.2f seconds.", sTargetName, time);
 	else
-		SendPrint(client, "You have set crits on {U}%s {D} for %.2f seconds.", sTargetName, time);
+		Vertex_SendPrint(client, "You have set crits on [H]%s [D]for %.2f seconds.", sTargetName, time);
 
 	return Plugin_Handled;
 }
@@ -2451,12 +2418,12 @@ public Action Command_RemoveCrits(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to remove crits from.");
+		Vertex_SendPrint(client, "You must specify a target to remove crits from.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -2481,13 +2448,13 @@ public Action Command_RemoveCrits(int client, int args)
 			continue;
 
 		TF2_RemoveCondition(targets_list[i], TFCond_CritOnWin);
-		SendPrint(targets_list[i], "Your have been stripped of crits by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your have been stripped of crits by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have stripped crits from {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have stripped crits from [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have stripped crits from {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have stripped crits from [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -2496,7 +2463,7 @@ public Action Command_SetGod(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set godmode on.");
+		Vertex_SendPrint(client, "You must specify a target to set godmode on.");
 		return Plugin_Handled;
 	}
 
@@ -2518,13 +2485,13 @@ public Action Command_SetGod(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		TF2_SetGodmode(targets_list[i], TFGod_God);
-		SendPrint(targets_list[i], "Your have been set to godmode by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your have been set to godmode by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set godmode on {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have set godmode on [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have set godmode on {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have set godmode on [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -2533,7 +2500,7 @@ public Action Command_SetBuddha(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set buddhamode on.");
+		Vertex_SendPrint(client, "You must specify a target to set buddhamode on.");
 		return Plugin_Handled;
 	}
 
@@ -2555,13 +2522,13 @@ public Action Command_SetBuddha(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		TF2_SetGodmode(targets_list[i], TFGod_Buddha);
-		SendPrint(targets_list[i], "Your have been set to buddhamode by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your have been set to buddhamode by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set buddhamode on {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have set buddhamode on [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have set buddhamode on {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have set buddhamode on [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -2570,7 +2537,7 @@ public Action Command_SetMortal(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to set mortalmode on.");
+		Vertex_SendPrint(client, "You must specify a target to set mortalmode on.");
 		return Plugin_Handled;
 	}
 
@@ -2592,13 +2559,13 @@ public Action Command_SetMortal(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		TF2_SetGodmode(targets_list[i], TFGod_Mortal);
-		SendPrint(targets_list[i], "Your have been set to mortalmode by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your have been set to mortalmode by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have set mortalmode on {U}%t {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have set mortalmode on [H]%t [D].", sTargetName);
 	else
-		SendPrint(client, "You have set mortalmode on {U}%s {D}.", sTargetName);
+		Vertex_SendPrint(client, "You have set mortalmode on [H]%s [D].", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -2607,7 +2574,7 @@ public Action Command_StunPlayer(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to stun.");
+		Vertex_SendPrint(client, "You must specify a target to stun.");
 		return Plugin_Handled;
 	}
 
@@ -2637,7 +2604,7 @@ public Action Command_StunPlayer(int client, int args)
 
 		if (time < 0.0)
 		{
-			SendPrint(client, "You have specified an invalid time.");
+			Vertex_SendPrint(client, "You have specified an invalid time.");
 			return Plugin_Handled;
 		}
 	}
@@ -2653,7 +2620,7 @@ public Action Command_StunPlayer(int client, int args)
 
 		if (slowdown < 0.0 || slowdown > 1.00)
 		{
-			SendPrint(client, "You have specified an invalid slowdown.");
+			Vertex_SendPrint(client, "You have specified an invalid slowdown.");
 			return Plugin_Handled;
 		}
 	}
@@ -2661,13 +2628,13 @@ public Action Command_StunPlayer(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		TF2_StunPlayer(targets_list[i], time, slowdown, TF_STUNFLAGS_SMALLBONK, client);
-		SendPrint(targets_list[i], "Your have been stunned by {U}%N {D}  for %.2f seconds.", client, time);
+		Vertex_SendPrint(targets_list[i], "Your have been stunned by [H]%N [D] for %.2f seconds.", client, time);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have stunned {U}%t {D}  for %.2f seconds.", sTargetName, time);
+		Vertex_SendPrint(client, "You have stunned [H]%t [D] for %.2f seconds.", sTargetName, time);
 	else
-		SendPrint(client, "You have stunned {U}%s {D}  for %.2f seconds.", sTargetName, time);
+		Vertex_SendPrint(client, "You have stunned [H]%s [D] for %.2f seconds.", sTargetName, time);
 
 	return Plugin_Handled;
 }
@@ -2676,12 +2643,12 @@ public Action Command_BleedPlayer(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to bleed.");
+		Vertex_SendPrint(client, "You must specify a target to bleed.");
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
@@ -2711,7 +2678,7 @@ public Action Command_BleedPlayer(int client, int args)
 
 		if (time < 0.0)
 		{
-			SendPrint(client, "You have specified an invalid time.");
+			Vertex_SendPrint(client, "You have specified an invalid time.");
 			return Plugin_Handled;
 		}
 	}
@@ -2719,13 +2686,13 @@ public Action Command_BleedPlayer(int client, int args)
 	for (int i = 0; i < targets; i++)
 	{
 		TF2_MakeBleed(targets_list[i], client, time);
-		SendPrint(targets_list[i], "Your have been cut by {U}%N {D}  for %.2f seconds.", client, time);
+		Vertex_SendPrint(targets_list[i], "Your have been cut by [H]%N [D] for %.2f seconds.", client, time);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have cut {U}%t {D}  for %.2f seconds.", sTargetName, time);
+		Vertex_SendPrint(client, "You have cut [H]%t [D] for %.2f seconds.", sTargetName, time);
 	else
-		SendPrint(client, "You have cut {U}%s {D}  for %.2f seconds.", sTargetName, time);
+		Vertex_SendPrint(client, "You have cut [H]%s [D] for %.2f seconds.", sTargetName, time);
 
 	return Plugin_Handled;
 }
@@ -2734,7 +2701,7 @@ public Action Command_IgnitePlayer(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a target to ignite.");
+		Vertex_SendPrint(client, "You must specify a target to ignite.");
 		return Plugin_Handled;
 	}
 
@@ -2760,13 +2727,13 @@ public Action Command_IgnitePlayer(int client, int args)
 		else
 			IgniteEntity(targets_list[i], 99999.0);
 		
-		SendPrint(targets_list[i], "Your have been ignited by {U}%N {D}.", client);
+		Vertex_SendPrint(targets_list[i], "Your have been ignited by [H]%N [D].", client);
 	}
 	
 	if (tn_is_ml)
-		SendPrint(client, "You have ignited {U}%t {D}", sTargetName);
+		Vertex_SendPrint(client, "You have ignited [H]%t [D]", sTargetName);
 	else
-		SendPrint(client, "You have ignited {U}%s {D}", sTargetName);
+		Vertex_SendPrint(client, "You have ignited [H]%s [D]", sTargetName);
 
 	return Plugin_Handled;
 }
@@ -2779,7 +2746,7 @@ public Action Command_ReloadMap(int client, int args)
 
 	char sMap[MAX_MAP_NAME_LENGTH];
 	GetMapName(sMap, sizeof(sMap));
-	SendPrintAll("{U}%N {D} has initiated a map reload.", client);
+	Vertex_SendPrintToAll("[H]%N [D]has initiated a map reload.", client);
 
 	return Plugin_Handled;
 }
@@ -2793,9 +2760,9 @@ public Action Command_MapName(int client, int args)
 	GetMapDisplayName(sCurrentMap, sMap, sizeof(sMap));
 
 	if (StrContains(sCurrentMap, "workshop/", false) == 0)
-		SendPrint(client, "Name: {U}%s {D} [{U}%s {D}]", sMap, sCurrentMap);
+		Vertex_SendPrint(client, "Name: [H]%s [D][[H]%s [D]]", sMap, sCurrentMap);
 	else
-		SendPrint(client, "Name: {U}%s {D}", sCurrentMap);
+		Vertex_SendPrint(client, "Name: [H]%s [D]", sCurrentMap);
 
 	return Plugin_Handled;
 }
@@ -2806,19 +2773,19 @@ public Action Command_SpawnSentry(int client, int args)
 	{
 		char sCommand[32];
 		GetCommandName(sCommand, sizeof(sCommand));
-		SendPrint(client, "Usage: {U}%s {D} <target> <team> <level> <mini> <disposable>", sCommand);
+		Vertex_SendPrint(client, "Usage: [H]%s [D]<target> <team> <level> <mini> <disposable>", sCommand);
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
 	float vecOrigin[3];
 	if (!GetClientLookOrigin(client, vecOrigin))
 	{
-		SendPrint(client, "Invalid look position.");
+		Vertex_SendPrint(client, "Invalid look position.");
 		return Plugin_Handled;
 	}
 
@@ -2845,19 +2812,19 @@ public Action Command_SpawnDispenser(int client, int args)
 	{
 		char sCommand[32];
 		GetCommandName(sCommand, sizeof(sCommand));
-		SendPrint(client, "Usage: {U}%s {D} <target> <team> <level>", sCommand);
+		Vertex_SendPrint(client, "Usage: [H]%s [D]<target> <team> <level>", sCommand);
 		return Plugin_Handled;
 	}
 	else if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 
 	float vecOrigin[3];
 	if (!GetClientLookOrigin(client, vecOrigin))
 	{
-		SendPrint(client, "Invalid look position.");
+		Vertex_SendPrint(client, "Invalid look position.");
 		return Plugin_Handled;
 	}
 
@@ -2882,14 +2849,14 @@ public Action Command_SpawnTeleporter(int client, int args)
 	{
 		char sCommand[32];
 		GetCommandName(sCommand, sizeof(sCommand));
-		SendPrint(client, "Usage: {U}%s {D} <target> <team> <level> <mode>", sCommand);
+		Vertex_SendPrint(client, "Usage: [H]%s [D]<target> <team> <level> <mode>", sCommand);
 		return Plugin_Handled;
 	}
 
 	float vecOrigin[3];
 	if (!GetClientLookOrigin(client, vecOrigin))
 	{
-		SendPrint(client, "Invalid look position.");
+		Vertex_SendPrint(client, "Invalid look position.");
 		return Plugin_Handled;
 	}
 
@@ -2915,7 +2882,7 @@ public Action Command_Particle(int client, int args)
 	{
 		char sCommand[64];
 		GetCommandName(sCommand, sizeof(sCommand));
-		SendPrint(client, "Usage: {U}%s {D} <particle> <time>", sCommand);
+		Vertex_SendPrint(client, "Usage: [H]%s [D]<particle> <time>", sCommand);
 		return Plugin_Handled;
 	}
 	
@@ -2931,7 +2898,7 @@ public Action Command_Particle(int client, int args)
 	GetClientLookOrigin(client, vecOrigin);
 	
 	CreateParticle(sParticle, vecOrigin, time);
-	SendPrint(client, "Particle {U}%s {D} has been spawned for %.2f second(s).", sParticle, time);
+	Vertex_SendPrint(client, "Particle [H]%s [D]has been spawned for %.2f second(s).", sParticle, time);
 	
 	return Plugin_Handled;
 }
@@ -2948,7 +2915,7 @@ void ListParticles(int client)
 	
 	if (tblidx == INVALID_STRING_TABLE)
 	{
-		SendPrint(client, "Could not find string table: ParticleEffectNames");
+		Vertex_SendPrint(client, "Could not find string table: ParticleEffectNames");
 		return;
 	}
 	
@@ -2981,7 +2948,7 @@ public int MenuHandler_Particles(Menu menu, MenuAction action, int param1, int p
 			GetClientLookOrigin(param1, vecOrigin);
 			
 			CreateParticle(sParticle, vecOrigin, 2.0);
-			SendPrint(param1, "Particle {U}%s {D} has been spawned for 2.0 seconds.", sParticle);
+			Vertex_SendPrint(param1, "Particle [H]%s [D]has been spawned for 2.0 seconds.", sParticle);
 			
 			ListParticles(param1);
 		}
@@ -3001,7 +2968,7 @@ public Action Command_GenerateParticles(int client, int args)
 		
 		if (!DirExists(sPath))
 		{
-			SendPrint(client, "Error finding and creating directory: {U}%s {D}", sPath);
+			Vertex_SendPrint(client, "Error finding and creating directory: [H]%s [D]", sPath);
 			return Plugin_Handled;
 		}
 	}
@@ -3015,7 +2982,7 @@ public Action Command_GenerateParticles(int client, int args)
 	
 	if (file == null)
 	{
-		SendPrint(client, "Error opening up file for writing: {U}%s {D}", sPath);
+		Vertex_SendPrint(client, "Error opening up file for writing: [H]%s [D]", sPath);
 		return Plugin_Handled;
 	}
 	
@@ -3023,7 +2990,7 @@ public Action Command_GenerateParticles(int client, int args)
 	
 	if (tblidx == INVALID_STRING_TABLE)
 	{
-		SendPrint(client, "Could not find string table: ParticleEffectNames");
+		Vertex_SendPrint(client, "Could not find string table: ParticleEffectNames");
 		return Plugin_Handled;
 	}
 	
@@ -3035,7 +3002,7 @@ public Action Command_GenerateParticles(int client, int args)
 	}
 	
 	delete file;
-	SendPrint(client, "Particles file generated successfully for {U}%s {D} at: {U}%s {D}", sGame, sPath);
+	Vertex_SendPrint(client, "Particles file generated successfully for [H]%s [D]at: [H]%s [D]", sGame, sPath);
 	
 	return Plugin_Handled;
 }
@@ -3043,7 +3010,7 @@ public Action Command_GenerateParticles(int client, int args)
 public Action Command_SpewSounds(int client, int args)
 {
 	g_SpewSounds = !g_SpewSounds;
-	SendPrint(client, "Spew Sounds: {U}%s {D}", g_SpewSounds ? "ON" : "OFF");
+	Vertex_SendPrint(client, "Spew Sounds: [H]%s [D]", g_SpewSounds ? "ON" : "OFF");
 	
 	if (g_SpewSounds)
 		AddNormalSoundHook(SpewSounds);
@@ -3055,13 +3022,13 @@ public Action Command_SpewSounds(int client, int args)
 
 public Action SpewSounds(int clients[MAXPLAYERS], int &numClients, char sample[PLATFORM_MAX_PATH], int &entity, int &channel, float &volume, int &level, int &pitch, int &flags, char soundEntry[PLATFORM_MAX_PATH], int &seed)
 {
-	SendPrintAll("[SpewSounds] -: {U}%s {D}", sample);
+	Vertex_SendPrintToAll("[SpewSounds] -: [H]%s [D]", sample);
 }
 
 public Action Command_SpewAmbients(int client, int args)
 {
 	g_SpewAmbients = !g_SpewAmbients;
-	SendPrint(client, "Spew Ambients: {U}%s {D}", g_SpewAmbients ? "ON" : "OFF");
+	Vertex_SendPrint(client, "Spew Ambients: [H]%s [D]", g_SpewAmbients ? "ON" : "OFF");
 	
 	if (g_SpewAmbients)
 		AddAmbientSoundHook(SpewAmbients);
@@ -3073,13 +3040,13 @@ public Action Command_SpewAmbients(int client, int args)
 
 public Action SpewAmbients(char sample[PLATFORM_MAX_PATH], int &entity, float &volume, int &level, int &pitch, float pos[3], int &flags, float &delay)
 {
-	SendPrintAll("[SpewAmbients] -: {U}%s {D}", sample);
+	Vertex_SendPrintToAll("[SpewAmbients] -: [H]%s [D]", sample);
 }
 
 public Action Command_SpewEntities(int client, int args)
 {
 	g_SpewEntities = !g_SpewEntities;
-	SendPrint(client, "Spew Entities: {U}%s {D}", g_SpewEntities ? "ON" : "OFF");
+	Vertex_SendPrint(client, "Spew Entities: [H]%s [D]", g_SpewEntities ? "ON" : "OFF");
 	
 	return Plugin_Handled;
 }
@@ -3087,7 +3054,7 @@ public Action Command_SpewEntities(int client, int args)
 public void OnEntityCreated(int entity, const char[] classname)
 {
 	if (g_SpewEntities)
-		SendPrintAll("[SpewEntities] -{U}%i {D}: {U}%s {D}({U}Created{D})", entity, classname);
+		Vertex_SendPrintToAll("[SpewEntities] -[H]%i [D]: [H]%s [D]([H]Created[D])", entity, classname);
 	
 	if (StrContains(classname, "trigger", false) == 0)
 		SDKHook(entity, SDKHook_StartTouch, OnTriggerTouch);
@@ -3099,19 +3066,19 @@ public Action Command_GetEntModel(int client, int args)
 	
 	if (!IsValidEntity(target))
 	{
-		SendPrint(client, "Target not found, please aim your crosshair at the entity.");
+		Vertex_SendPrint(client, "Target not found, please aim your crosshair at the entity.");
 		return Plugin_Handled;
 	}
 	
 	if (!HasEntProp(target, Prop_Data, "m_ModelName"))
 	{
-		SendPrint(client, "Target doesn't have a valid model.");
+		Vertex_SendPrint(client, "Target doesn't have a valid model.");
 		return Plugin_Handled;
 	}
 	
 	char sModel[PLATFORM_MAX_PATH];
 	GetEntPropString(target, Prop_Data, "m_ModelName", sModel, sizeof(sModel));
-	SendPrint(client, "Model Found: {U}%s {D}", sModel);
+	Vertex_SendPrint(client, "Model Found: [H]%s [D]", sModel);
 	
 	return Plugin_Handled;
 }
@@ -3120,13 +3087,13 @@ public Action Command_SetKillstreak(int client, int args)
 {
 	if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 	
 	int value = GetCmdArgInt(1);
 	TF2_SetKillstreak(client, value);
-	SendPrint(client, "Killstreak set to: {U}%i {D}", value);
+	Vertex_SendPrint(client, "Killstreak set to: [H]%i [D]", value);
 	return Plugin_Handled;
 }
 
@@ -3134,7 +3101,7 @@ public Action Command_CreateEntity(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "You must specify a classname.");
+		Vertex_SendPrint(client, "You must specify a classname.");
 		return Plugin_Handled;
 	}
 
@@ -3143,7 +3110,7 @@ public Action Command_CreateEntity(int client, int args)
 
 	if (args == 1)
 	{
-		SendPrint(client, "You must specify an entity name for reference.");
+		Vertex_SendPrint(client, "You must specify an entity name for reference.");
 		return Plugin_Handled;
 	}
 
@@ -3154,24 +3121,24 @@ public Action Command_CreateEntity(int client, int args)
 
 	if (!IsValidEntity(entity))
 	{
-		SendPrint(client, "Unknown error while creating entity.");
+		Vertex_SendPrint(client, "Unknown error while creating entity.");
 		return Plugin_Handled;
 	}
 
 	if (!DispatchKeyValue(entity, "targetname", sName))
 	{
-		SendPrint(client, "Error while setting entity classname to '{U}%s {D}'.", sName);
+		Vertex_SendPrint(client, "Error while setting entity classname to '[H]%s [D]'.", sName);
 		AcceptEntityInput(entity, "Kill");
 		return Plugin_Handled;
 	}
 
-	SendPrint(client, "'{U}%s {D}' entity created with the index '{U}%i {D}'.", sClassname, entity);
+	Vertex_SendPrint(client, "'[H]%s [D]' entity created with the index '[H]%i [D]'.", sClassname, entity);
 
 	g_OwnedEntities[client].Push(EntIndexToEntRef(entity));
-	SendPrint(client, "Entity '{U}%i {D}' is now under ownership of you.", entity);
+	Vertex_SendPrint(client, "Entity '[H]%i [D]' is now under ownership of you.", entity);
 
 	g_iTarget[client] = EntIndexToEntRef(entity);
-	SendPrint(client, "Entity '{U}%s {D}' is now targetted by you.", sName);
+	Vertex_SendPrint(client, "Entity '[H]%s [D]' is now targetted by you.", sName);
 
 	return Plugin_Handled;
 }
@@ -3180,13 +3147,13 @@ public Action Command_DispatchKeyValue(int client, int args)
 {
 	if (args < 2)
 	{
-		SendPrint(client, "You must input at least 2 arguments for the key and the value.");
+		Vertex_SendPrint(client, "You must input at least 2 arguments for the key and the value.");
 		return Plugin_Handled;
 	}
 
 	if (g_iTarget[client] == INVALID_ENT_REFERENCE)
 	{
-		SendPrint(client, "You aren't currently targeting an entity.");
+		Vertex_SendPrint(client, "You aren't currently targeting an entity.");
 		return Plugin_Handled;
 	}
 
@@ -3194,7 +3161,7 @@ public Action Command_DispatchKeyValue(int client, int args)
 
 	if (!IsValidEntity(entity) || entity < 1)
 	{
-		SendPrint(client, "Entity is no longer valid.");
+		Vertex_SendPrint(client, "Entity is no longer valid.");
 		g_iTarget[client] = INVALID_ENT_REFERENCE;
 		return Plugin_Handled;
 	}
@@ -3209,7 +3176,7 @@ public Action Command_DispatchKeyValue(int client, int args)
 	GetEntityName(entity, sName, sizeof(sName));
 
 	DispatchKeyValue(entity, sKeyName, sValue);
-	SendPrint(client, "Targetted entity '{U}%s {D}' is now dispatch keyvalue '{U}%s {D}' for '{U}%s {D}'.", strlen(sName) > 0 ? sName : "N/A", sKeyName, sValue);
+	Vertex_SendPrint(client, "Targetted entity '[H]%s [D]' is now dispatch keyvalue '[H]%s [D]' for '[H]%s [D]'.", strlen(sName) > 0 ? sName : "N/A", sKeyName, sValue);
 
 	return Plugin_Handled;
 }
@@ -3218,13 +3185,13 @@ public Action Command_DispatchKeyValueFloat(int client, int args)
 {
 	if (args < 2)
 	{
-		SendPrint(client, "You must input at least 2 arguments for the key and the value.");
+		Vertex_SendPrint(client, "You must input at least 2 arguments for the key and the value.");
 		return Plugin_Handled;
 	}
 
 	if (g_iTarget[client] == INVALID_ENT_REFERENCE)
 	{
-		SendPrint(client, "You aren't currently targeting an entity.");
+		Vertex_SendPrint(client, "You aren't currently targeting an entity.");
 		return Plugin_Handled;
 	}
 
@@ -3232,7 +3199,7 @@ public Action Command_DispatchKeyValueFloat(int client, int args)
 
 	if (!IsValidEntity(entity) || entity < 1)
 	{
-		SendPrint(client, "Entity is no longer valid.");
+		Vertex_SendPrint(client, "Entity is no longer valid.");
 		g_iTarget[client] = INVALID_ENT_REFERENCE;
 		return Plugin_Handled;
 	}
@@ -3248,7 +3215,7 @@ public Action Command_DispatchKeyValueFloat(int client, int args)
 	GetEntityName(entity, sName, sizeof(sName));
 
 	DispatchKeyValueFloat(entity, sKeyName, fValue);
-	SendPrint(client, "Targetted entity '{U}%s {D}' is now dispatch keyvalue '{U}%s {D}' for '%.2f'.", strlen(sName) > 0 ? sName : "N/A", sKeyName, fValue);
+	Vertex_SendPrint(client, "Targetted entity '[H]%s [D]' is now dispatch keyvalue '[H]%s [D]' for '%.2f'.", strlen(sName) > 0 ? sName : "N/A", sKeyName, fValue);
 
 	return Plugin_Handled;
 }
@@ -3257,13 +3224,13 @@ public Action Command_DispatchKeyValueVector(int client, int args)
 {
 	if (args < 2)
 	{
-		SendPrint(client, "You must input at least 2 arguments for the key and the value.");
+		Vertex_SendPrint(client, "You must input at least 2 arguments for the key and the value.");
 		return Plugin_Handled;
 	}
 
 	if (g_iTarget[client] == INVALID_ENT_REFERENCE)
 	{
-		SendPrint(client, "You aren't currently targeting an entity.");
+		Vertex_SendPrint(client, "You aren't currently targeting an entity.");
 		return Plugin_Handled;
 	}
 
@@ -3271,7 +3238,7 @@ public Action Command_DispatchKeyValueVector(int client, int args)
 
 	if (!IsValidEntity(entity) || entity < 1)
 	{
-		SendPrint(client, "Entity is no longer valid.");
+		Vertex_SendPrint(client, "Entity is no longer valid.");
 		g_iTarget[client] = INVALID_ENT_REFERENCE;
 		return Plugin_Handled;
 	}
@@ -3289,7 +3256,7 @@ public Action Command_DispatchKeyValueVector(int client, int args)
 	GetEntityName(entity, sName, sizeof(sName));
 
 	DispatchKeyValueVector(entity, sKeyName, vecValue);
-	SendPrint(client, "Targetted entity '{U}%s {D}' is now dispatch keyvalue '{U}%s {D}' for '%.2f/%.2f/%.2f'.", strlen(sName) > 0 ? sName : "N/A", sKeyName, vecValue[0], vecValue[1], vecValue[2]);
+	Vertex_SendPrint(client, "Targetted entity '[H]%s [D]' is now dispatch keyvalue '[H]%s [D]' for '%.2f/%.2f/%.2f'.", strlen(sName) > 0 ? sName : "N/A", sKeyName, vecValue[0], vecValue[1], vecValue[2]);
 
 	return Plugin_Handled;
 }
@@ -3298,7 +3265,7 @@ public Action Command_DispatchSpawn(int client, int args)
 {
 	if (g_iTarget[client] == INVALID_ENT_REFERENCE)
 	{
-		SendPrint(client, "You aren't currently targeting an entity.");
+		Vertex_SendPrint(client, "You aren't currently targeting an entity.");
 		return Plugin_Handled;
 	}
 
@@ -3306,7 +3273,7 @@ public Action Command_DispatchSpawn(int client, int args)
 
 	if (!IsValidEntity(entity) || entity < 1)
 	{
-		SendPrint(client, "Entity is no longer valid.");
+		Vertex_SendPrint(client, "Entity is no longer valid.");
 		g_iTarget[client] = INVALID_ENT_REFERENCE;
 		return Plugin_Handled;
 	}
@@ -3315,7 +3282,7 @@ public Action Command_DispatchSpawn(int client, int args)
 	GetEntityName(entity, sName, sizeof(sName));
 
 	DispatchSpawn(entity);
-	SendPrint(client, "Targetted entity '{U}%s {D}' is now dispatch spawned.", strlen(sName) > 0 ? sName : "N/A");
+	Vertex_SendPrint(client, "Targetted entity '[H]%s [D]' is now dispatch spawned.", strlen(sName) > 0 ? sName : "N/A");
 
 	return Plugin_Handled;
 }
@@ -3324,7 +3291,7 @@ public Action Command_AcceptEntityInput(int client, int args)
 {
 	if (g_iTarget[client] == INVALID_ENT_REFERENCE)
 	{
-		SendPrint(client, "You aren't currently targeting an entity.");
+		Vertex_SendPrint(client, "You aren't currently targeting an entity.");
 		return Plugin_Handled;
 	}
 
@@ -3332,7 +3299,7 @@ public Action Command_AcceptEntityInput(int client, int args)
 
 	if (!IsValidEntity(entity) || entity < 1)
 	{
-		SendPrint(client, "Entity is no longer valid.");
+		Vertex_SendPrint(client, "Entity is no longer valid.");
 		g_iTarget[client] = INVALID_ENT_REFERENCE;
 		return Plugin_Handled;
 	}
@@ -3356,7 +3323,7 @@ public Action Command_AcceptEntityInput(int client, int args)
 	GetEntityName(entity, sName, sizeof(sName));
 
 	AcceptEntityInput(entity, sInput);
-	SendPrint(client, "Targetted entity '{U}%s {D}' input '{U}%s {D}' sent.", strlen(sName) > 0 ? sName : "N/A", sInput);
+	Vertex_SendPrint(client, "Targetted entity '[H]%s [D]' input '[H]%s [D]' sent.", strlen(sName) > 0 ? sName : "N/A", sInput);
 
 	return Plugin_Handled;
 }
@@ -3365,7 +3332,7 @@ public Action Command_Animate(int client, int args)
 {
 	if (g_iTarget[client] == INVALID_ENT_REFERENCE)
 	{
-		SendPrint(client, "You aren't currently targeting an entity.");
+		Vertex_SendPrint(client, "You aren't currently targeting an entity.");
 		return Plugin_Handled;
 	}
 
@@ -3373,7 +3340,7 @@ public Action Command_Animate(int client, int args)
 
 	if (!IsValidEntity(entity) || entity < 1)
 	{
-		SendPrint(client, "Entity is no longer valid.");
+		Vertex_SendPrint(client, "Entity is no longer valid.");
 		g_iTarget[client] = INVALID_ENT_REFERENCE;
 		return Plugin_Handled;
 	}
@@ -3386,7 +3353,7 @@ public Action Command_Animate(int client, int args)
 	
 	SetVariantString(sAnimation);
 	AcceptEntityInput(entity, "SetAnimation");
-	SendPrint(client, "Targetted entity '{U}%s {D}' animation '{U}%s {D}' set.", strlen(sName) > 0 ? sName : "N/A", sAnimation);
+	Vertex_SendPrint(client, "Targetted entity '[H]%s [D]' animation '[H]%s [D]' set.", strlen(sName) > 0 ? sName : "N/A", sAnimation);
 
 	return Plugin_Handled;
 }
@@ -3397,7 +3364,7 @@ public Action Command_TargetEntity(int client, int args)
 
 	if (!IsValidEntity(entity))
 	{
-		SendPrint(client, "You aren't aiming at a valid entity.");
+		Vertex_SendPrint(client, "You aren't aiming at a valid entity.");
 		return Plugin_Handled;
 	}
 
@@ -3405,7 +3372,7 @@ public Action Command_TargetEntity(int client, int args)
 	GetEntityName(entity, sName, sizeof(sName));
 
 	g_iTarget[client] = EntIndexToEntRef(entity);
-	SendPrint(client, "Entity '{U}%s {D}' is now targetted by you.", sName);
+	Vertex_SendPrint(client, "Entity '[H]%s [D]' is now targetted by you.", sName);
 
 	return Plugin_Handled;
 }
@@ -3414,7 +3381,7 @@ public Action Command_DeleteEntity(int client, int args)
 {
 	if (g_iTarget[client] == INVALID_ENT_REFERENCE)
 	{
-		SendPrint(client, "You aren't currently targeting an entity.");
+		Vertex_SendPrint(client, "You aren't currently targeting an entity.");
 		return Plugin_Handled;
 	}
 
@@ -3422,7 +3389,7 @@ public Action Command_DeleteEntity(int client, int args)
 
 	if (!IsValidEntity(entity) || entity < 1)
 	{
-		SendPrint(client, "Entity is no longer valid.");
+		Vertex_SendPrint(client, "Entity is no longer valid.");
 		g_iTarget[client] = INVALID_ENT_REFERENCE;
 		return Plugin_Handled;
 	}
@@ -3432,7 +3399,7 @@ public Action Command_DeleteEntity(int client, int args)
 
 	AcceptEntityInput(entity, "Kill");
 	g_iTarget[client] = INVALID_ENT_REFERENCE;
-	SendPrint(client, "Targetted entity '{U}%s {D}' is now deleted.", strlen(sName) > 0 ? sName : "N/A");
+	Vertex_SendPrint(client, "Targetted entity '[H]%s [D]' is now deleted.", strlen(sName) > 0 ? sName : "N/A");
 
 	return Plugin_Handled;
 }
@@ -3443,7 +3410,7 @@ public Action Command_ListOwnedEntities(int client, int args)
 
 	if (owned == 0)
 	{
-		SendPrint(client, "You currently don't own any entities.");
+		Vertex_SendPrint(client, "You currently don't own any entities.");
 		return Plugin_Handled;
 	}
 
@@ -3503,7 +3470,7 @@ public int MenuHandler_ListOwnedEntities(Menu menu, MenuAction action, int param
 			}
 
 			g_iTarget[param1] = EntIndexToEntRef(entity);
-			SendPrint(param1, "{U}%s {D} Entity '{U}%s {D}' is now targetted by you.", sName);
+			Vertex_SendPrint(param1, "[H]%s [D]Entity '[H]%s [D]' is now targetted by you.", sName);
 			Command_ListOwnedEntities(param1, 0);
 		}
 
@@ -3523,13 +3490,13 @@ public Action Command_GiveWeapon(int client, int args)
 	
 	if (target == -1)
 	{
-		SendPrint(client, "Invalid target specified: Not Found");
+		Vertex_SendPrint(client, "Invalid target specified: Not Found");
 		return Plugin_Handled;
 	}
 	
 	if (!IsPlayerAlive(target))
 	{
-		SendPrint(client, "Invalid target specified: Not Alive");
+		Vertex_SendPrint(client, "Invalid target specified: Not Alive");
 		return Plugin_Handled;
 	}
 	
@@ -3542,7 +3509,7 @@ public Action Command_GiveWeapon(int client, int args)
 			
 			if (index < 0)
 			{
-				SendPrint(client, "Invalid index specified, please specify an index.");
+				Vertex_SendPrint(client, "Invalid index specified, please specify an index.");
 				return Plugin_Handled;
 			}
 			
@@ -3557,15 +3524,15 @@ public Action Command_GiveWeapon(int client, int args)
 				EquipWeapon(client, weapon);
 				
 				if (client == target)
-					SendPrint(client, "Weapon with index %i and class %s has been equipped.", index, class);
+					Vertex_SendPrint(client, "Weapon with index %i and class %s has been equipped.", index, class);
 				else
 				{
-					SendPrint(client, "Weapon with index %i and class %s has been given to %N.", index, class, target);
-					SendPrint(target, "Weapon with index %i and class %s has been received by %N.", index, class, client);
+					Vertex_SendPrint(client, "Weapon with index %i and class %s has been given to %N.", index, class, target);
+					Vertex_SendPrint(target, "Weapon with index %i and class %s has been received by %N.", index, class, client);
 				}
 			}
 			else
-				SendPrint(client, "Unknown error while creating weapon with index %i and class %s.", index, class);
+				Vertex_SendPrint(client, "Unknown error while creating weapon with index %i and class %s.", index, class);
 		}
 		default:
 		{
@@ -3573,7 +3540,7 @@ public Action Command_GiveWeapon(int client, int args)
 			
 			if (args < 1 || strlen(class) == 0)
 			{
-				SendPrint(client, "Invalid Item specified, please input one.");
+				Vertex_SendPrint(client, "Invalid Item specified, please input one.");
 				return Plugin_Handled;
 			}
 			
@@ -3587,15 +3554,15 @@ public Action Command_GiveWeapon(int client, int args)
 				EquipWeapon(client, weapon);
 				
 				if (client == target)
-					SendPrint(client, "Weapon with class %s has been equipped.", class);
+					Vertex_SendPrint(client, "Weapon with class %s has been equipped.", class);
 				else
 				{
-					SendPrint(client, "Weapon with class %s has been given to %N.", class, target);
-					SendPrint(target, "Weapon with class %s has been received by %N.", class, client);
+					Vertex_SendPrint(client, "Weapon with class %s has been given to %N.", class, target);
+					Vertex_SendPrint(target, "Weapon with class %s has been received by %N.", class, client);
 				}
 			}
 			else
-				SendPrint(client, "Unknown error while creating weapon with class %s.", class);
+				Vertex_SendPrint(client, "Unknown error while creating weapon with class %s.", class);
 		}
 	}
 	
@@ -3611,7 +3578,7 @@ public Action Command_SpawnHealthkit(int client, int args)
 	GetClientLookOrigin(client, vecOrigin);
 	
 	TF2_SpawnPickup(vecOrigin, PICKUP_TYPE_HEALTHKIT, PICKUP_FULL);
-	SendPrintAll("Health kit has been spawned where you're looking.");
+	Vertex_SendPrintToAll("Health kit has been spawned where you're looking.");
 	
 	return Plugin_Handled;
 }
@@ -3619,7 +3586,7 @@ public Action Command_SpawnHealthkit(int client, int args)
 public Action Command_Lock(int client, int args)
 {
 	g_Locked = !g_Locked;
-	SendPrintAll(g_Locked ? "Server is now locked to admins by {U}%N {D}." : "Server is now unlocked by {U}%N {D}.", client);
+	Vertex_SendPrintToAll(g_Locked ? "Server is now locked to admins by [H]%N [D]." : "Server is now unlocked by [H]%N [D].", client);
 	return Plugin_Handled;
 }
 
@@ -3638,7 +3605,7 @@ public Action Command_CreateProp(int client, int args)
 {
 	if (args == 0)
 	{
-		SendPrint(client, "Must specify a model path.");
+		Vertex_SendPrint(client, "Must specify a model path.");
 		return Plugin_Handled;
 	}
 	
@@ -3652,7 +3619,7 @@ public Action Command_CreateProp(int client, int args)
 		PrecacheModel(sModel);
 	
 	CreateProp(sModel, vecOrigin);
-	SendPrint(client, "Prop has been spawned with model '{U}%s {D}'.", sModel);
+	Vertex_SendPrint(client, "Prop has been spawned with model '[H]%s [D]'.", sModel);
 	
 	return Plugin_Handled;
 }
@@ -3663,7 +3630,7 @@ public Action Command_AnimateProp(int client, int args)
 	
 	if (!IsValidEntity(target))
 	{
-		SendPrint(client, "No target has been found.");
+		Vertex_SendPrint(client, "No target has been found.");
 		return Plugin_Handled;
 	}
 	
@@ -3672,7 +3639,7 @@ public Action Command_AnimateProp(int client, int args)
 	
 	if (StrContains(sClassname, "prop_dynamic") != 0)
 	{
-		SendPrint(client, "Target is not a dynamic prop entity.");
+		Vertex_SendPrint(client, "Target is not a dynamic prop entity.");
 		return Plugin_Handled;
 	}
 	
@@ -3681,12 +3648,12 @@ public Action Command_AnimateProp(int client, int args)
 	
 	if (strlen(sAnimation) == 0)
 	{
-		SendPrint(client, "Invalid animation input, please specify one.");
+		Vertex_SendPrint(client, "Invalid animation input, please specify one.");
 		return Plugin_Handled;
 	}
 	
 	bool success = AnimateEntity(target, sAnimation);
-	SendPrint(client, "Animation '{U}%s {D}' has been sent to the target {U}%s {D}.", sAnimation, success ? "successfully" : "unsuccessfully");
+	Vertex_SendPrint(client, "Animation '[H]%s [D]' has been sent to the target [H]%s [D].", sAnimation, success ? "successfully" : "unsuccessfully");
 	
 	return Plugin_Handled;
 }
@@ -3697,7 +3664,7 @@ public Action Command_DeleteProp(int client, int args)
 	
 	if (!IsValidEntity(target))
 	{
-		SendPrint(client, "No target has been found.");
+		Vertex_SendPrint(client, "No target has been found.");
 		return Plugin_Handled;
 	}
 	
@@ -3706,12 +3673,12 @@ public Action Command_DeleteProp(int client, int args)
 	
 	if (StrContains(sClassname, "prop_dynamic") != 0)
 	{
-		SendPrint(client, "Target is not a dynamic prop entity.");
+		Vertex_SendPrint(client, "Target is not a dynamic prop entity.");
 		return Plugin_Handled;
 	}
 	
 	bool success = DeleteEntity(target);
-	SendPrint(client, "Prop has been deleted {U}%s {D}.", success ? "successfully" : "unsuccessfully");
+	Vertex_SendPrint(client, "Prop has been deleted [H]%s [D].", success ? "successfully" : "unsuccessfully");
 	
 	return Plugin_Handled;
 }
@@ -3728,7 +3695,7 @@ public Action Command_DebugEvents(int client, int args)
 		}
 		
 		g_HookEvents.Clear();
-		SendPrint(client, "Event debugging: OFF");
+		Vertex_SendPrint(client, "Event debugging: OFF");
 		
 		return Plugin_Handled;
 	}
@@ -3741,14 +3708,14 @@ public Action Command_DebugEvents(int client, int args)
 	if (!kv.ImportFromFile(sPath))
 	{
 		delete kv;
-		SendPrint(client, "Error finding file: {U}%s {D}", sPath);
+		Vertex_SendPrint(client, "Error finding file: [H]%s [D]", sPath);
 		return Plugin_Handled;
 	}
 	
 	if (!kv.GotoFirstSubKey())
 	{
 		delete kv;
-		SendPrint(client, "Error parsing file: {U}%s {D}", sPath);
+		Vertex_SendPrint(client, "Error parsing file: [H]%s [D]", sPath);
 		return Plugin_Handled;
 	}
 	
@@ -3762,7 +3729,7 @@ public Action Command_DebugEvents(int client, int args)
 	while (kv.GotoNextKey());
 	
 	delete kv;
-	SendPrint(client, "Event {U}%i {D} debugging: ON", g_HookEvents.Length);
+	Vertex_SendPrint(client, "Event [H]%i [D]debugging: ON", g_HookEvents.Length);
 	
 	return Plugin_Handled;
 }
@@ -3780,7 +3747,7 @@ public Action Command_SetRenderColor(int client, int args)
 	int alpha = GetCmdArgInt(4);
 	
 	SetEntityRenderColor(client, red, green, blue, alpha);
-	SendPrint(client, "Render color set to '{U}%i {D}/{U}%i {D}/{U}%i {D}/{U}%i {D}'.", red, green, blue, alpha);
+	Vertex_SendPrint(client, "Render color set to '[H]%i [D]/[H]%i [D]/[H]%i [D]/[H]%i [D]'.", red, green, blue, alpha);
 	
 	return Plugin_Handled;
 }
@@ -3791,7 +3758,7 @@ public Action Command_SetRenderFx(int client, int args)
 	GetCmdArgString(sArg, sizeof(sArg));
 	
 	SetEntityRenderFx(client, GetRenderFxByName(sArg));
-	SendPrint(client, "Render fx set to '{U}%s {D}'.", sArg);
+	Vertex_SendPrint(client, "Render fx set to '[H]%s [D]'.", sArg);
 	
 	return Plugin_Handled;
 }
@@ -3802,7 +3769,7 @@ public Action Command_SetRenderMode(int client, int args)
 	GetCmdArgString(sArg, sizeof(sArg));
 	
 	SetEntityRenderMode(client, GetRenderModeByName(sArg));
-	SendPrint(client, "Render mode set to '{U}%s {D}'.", sArg);
+	Vertex_SendPrint(client, "Render mode set to '[H]%s [D]'.", sArg);
 	
 	return Plugin_Handled;
 }
@@ -3814,13 +3781,13 @@ public Action Command_ApplyAttribute(int client, int args)
 	
 	if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 	
 	if (!IsPlayerAlive(client))
 	{
-		SendPrint(client, "You must be alive to apply attributes.");
+		Vertex_SendPrint(client, "You must be alive to apply attributes.");
 		return Plugin_Handled;
 	}
 	
@@ -3828,7 +3795,7 @@ public Action Command_ApplyAttribute(int client, int args)
 	{
 		char sCommand[64];
 		GetCommandName(sCommand, sizeof(sCommand));
-		SendPrint(client, "Usage: {U}%s {D} <attribute> <value> <0/1 weapons>", sCommand);
+		Vertex_SendPrint(client, "Usage: [H]%s [D]<attribute> <value> <0/1 weapons>", sCommand);
 		return Plugin_Handled;
 	}
 	
@@ -3843,23 +3810,23 @@ public Action Command_ApplyAttribute(int client, int args)
 	{
 		int index = StringToInt(sArg1);
 		TF2Attrib_SetByDefIndex(client, index, value);
-		SendPrint(client, "Applying attribute index '{U}%i {D}' to yourself with the value: %.2f", index, value);
+		Vertex_SendPrint(client, "Applying attribute index '[H]%i [D]' to yourself with the value: %.2f", index, value);
 		
 		if (args >= 3)
 		{
 			TF2Attrib_SetByDefIndex_Weapons(client, -1, index, value, GetCmdArgBool(4));
-			SendPrint(client, "Applying attribute index '{U}%i {D}' to your weapons with the value: %.2f", index, value);
+			Vertex_SendPrint(client, "Applying attribute index '[H]%i [D]' to your weapons with the value: %.2f", index, value);
 		}
 	}
 	else
 	{
 		TF2Attrib_SetByName(client, sArg1, value);
-		SendPrint(client, "Applying attribute '{U}%s {D}' to yourself with the value: %.2f", sArg1, value);
+		Vertex_SendPrint(client, "Applying attribute '[H]%s [D]' to yourself with the value: %.2f", sArg1, value);
 		
 		if (args >= 3)
 		{
 			TF2Attrib_SetByName_Weapons(client, -1, sArg1, value);
-			SendPrint(client, "Applying attribute '{U}%s {D}' to your weapons with the value: %.2f", sArg1, value);
+			Vertex_SendPrint(client, "Applying attribute '[H]%s [D]' to your weapons with the value: %.2f", sArg1, value);
 		}
 	}
 	
@@ -3873,13 +3840,13 @@ public Action Command_RemoveAttribute(int client, int args)
 		
 	if (game != Engine_TF2)
 	{
-		SendPrint(client, "This command is for Team Fortress 2 only.");
+		Vertex_SendPrint(client, "This command is for Team Fortress 2 only.");
 		return Plugin_Handled;
 	}
 	
 	if (!IsPlayerAlive(client))
 	{
-		SendPrint(client, "You must be alive to remove attributes.");
+		Vertex_SendPrint(client, "You must be alive to remove attributes.");
 		return Plugin_Handled;
 	}
 	
@@ -3887,7 +3854,7 @@ public Action Command_RemoveAttribute(int client, int args)
 	{
 		char sCommand[64];
 		GetCommandName(sCommand, sizeof(sCommand));
-		SendPrint(client, "Usage: {U}%s {D} <attribute> <0/1 weapons>", sCommand);
+		Vertex_SendPrint(client, "Usage: [H]%s [D]<attribute> <0/1 weapons>", sCommand);
 		return Plugin_Handled;
 	}
 	
@@ -3898,23 +3865,23 @@ public Action Command_RemoveAttribute(int client, int args)
 	{
 		int index = StringToInt(sArg1);
 		TF2Attrib_RemoveByDefIndex(client, index);
-		SendPrint(client, "Removing attribute index '{U}%i {D}' from yourself.", index);
+		Vertex_SendPrint(client, "Removing attribute index '[H]%i [D]' from yourself.", index);
 		
 		if (args >= 2)
 		{
 			TF2Attrib_RemoveByDefIndex_Weapons(client, -1, index);
-			SendPrint(client, "Removing attribute index '{U}%i {D}' from your weapons.", index);
+			Vertex_SendPrint(client, "Removing attribute index '[H]%i [D]' from your weapons.", index);
 		}
 	}
 	else
 	{
 		TF2Attrib_RemoveByName(client, sArg1);
-		SendPrint(client, "Removing attribute '{U}%s {D}' from yourself.", sArg1);
+		Vertex_SendPrint(client, "Removing attribute '[H]%s [D]' from yourself.", sArg1);
 		
 		if (args >= 2)
 		{
 			TF2Attrib_RemoveByName_Weapons(client, -1, sArg1);
-			SendPrint(client, "Removing attribute '{U}%s {D}' from your weapons.", sArg1);
+			Vertex_SendPrint(client, "Removing attribute '[H]%s [D]' from your weapons.", sArg1);
 		}
 	}
 	
@@ -3932,11 +3899,11 @@ public Action Command_GetEntProp(int client, int args)
 	
 	if (!HasEntProp(target, type, prop))
 	{
-		SendPrint(client, "Entity doesn't have netprop: %s", prop);
+		Vertex_SendPrint(client, "Entity doesn't have netprop: %s", prop);
 		return Plugin_Handled;
 	}
 	
-	SendPrint(client, "SetEntProp Output: %i", GetEntProp(target, type, prop));
+	Vertex_SendPrint(client, "SetEntProp Output: %i", GetEntProp(target, type, prop));
 	return Plugin_Handled;
 }
 
@@ -3951,13 +3918,13 @@ public Action Command_SetEntProp(int client, int args)
 	
 	if (!HasEntProp(target, type, prop))
 	{
-		SendPrint(client, "Entity doesn't have netprop: %s", prop);
+		Vertex_SendPrint(client, "Entity doesn't have netprop: %s", prop);
 		return Plugin_Handled;
 	}
 	
 	int value = GetCmdArgInt(3);
 	SetEntProp(target, type, prop, value);
-	SendPrint(client, "SetEntProp on %i: %i", target, value);
+	Vertex_SendPrint(client, "SetEntProp on %i: %i", target, value);
 	
 	return Plugin_Handled;
 }
@@ -3973,11 +3940,11 @@ public Action Command_GetEntPropFloat(int client, int args)
 	
 	if (!HasEntProp(target, type, prop))
 	{
-		SendPrint(client, "Entity doesn't have netprop: %s", prop);
+		Vertex_SendPrint(client, "Entity doesn't have netprop: %s", prop);
 		return Plugin_Handled;
 	}
 	
-	SendPrint(client, "SetEntPropFloat Output: %.2f", GetEntPropFloat(target, type, prop));
+	Vertex_SendPrint(client, "SetEntPropFloat Output: %.2f", GetEntPropFloat(target, type, prop));
 	return Plugin_Handled;
 }
 
@@ -3992,13 +3959,13 @@ public Action Command_SetEntPropFloat(int client, int args)
 	
 	if (!HasEntProp(target, type, prop))
 	{
-		SendPrint(client, "Entity doesn't have netprop: %s", prop);
+		Vertex_SendPrint(client, "Entity doesn't have netprop: %s", prop);
 		return Plugin_Handled;
 	}
 	
 	float value = GetCmdArgFloat(3);
 	SetEntPropFloat(target, type, prop, value);
-	SendPrint(client, "SetEntPropFloat on %i: %.2f", target, value);
+	Vertex_SendPrint(client, "SetEntPropFloat on %i: %.2f", target, value);
 	
 	return Plugin_Handled;
 }
@@ -4009,13 +3976,13 @@ public Action Command_GetEntClass(int client, int args)
 	
 	if (!IsValidEntity(target))
 	{
-		SendPrint(client, "Entity not found, please aim your crosshair at the entity.");
+		Vertex_SendPrint(client, "Entity not found, please aim your crosshair at the entity.");
 		return Plugin_Handled;
 	}
 	
 	char sClass[64];
 	GetEntityClassname(target, sClass, sizeof(sClass));
-	SendPrint(client, "Entity {U}%i{D}'s class: {U}%s", target, sClass);
+	Vertex_SendPrint(client, "Entity [H]%i[D]'s class: [H]%s", target, sClass);
 	
 	return Plugin_Handled;
 }
@@ -4053,7 +4020,7 @@ public Action Command_Stoptimer(int client, int args)
 public Action Command_SpewTriggers(int client, int args)
 {
 	g_SpewTriggers = !g_SpewTriggers;
-	SendPrint(client, "Spew Triggers Touched: {U}%s {D}", g_SpewTriggers ? "ON" : "OFF");
+	Vertex_SendPrint(client, "Spew Triggers Touched: [H]%s [D]", g_SpewTriggers ? "ON" : "OFF");
 	
 	return Plugin_Handled;
 }
@@ -4064,14 +4031,14 @@ public void OnTriggerTouch(int entity, int other)
 	{
 		char classname[64];
 		GetEntityClassname(entity, classname, sizeof(classname));
-		SendPrintAll("[SpewTriggers] -{U}%i {D}: {U}%s {D}({U}Touched {D}by {U}%N{D})", entity, classname, other);
+		Vertex_SendPrintToAll("[SpewTriggers] -[H]%i [D]: [H]%s [D]([H]Touched [D]by [H]%N[D])", entity, classname, other);
 	}
 }
 
 public Action Command_SpewCommands(int client, int args)
 {
 	g_SpewCommands = !g_SpewCommands;
-	SendPrint(client, "Spew Commands Touched: {U}%s {D}", g_SpewCommands ? "ON" : "OFF");
+	Vertex_SendPrint(client, "Spew Commands Touched: [H]%s [D]", g_SpewCommands ? "ON" : "OFF");
 	
 	return Plugin_Handled;
 }
@@ -4086,7 +4053,7 @@ public Action OnClientCommand(int client, int args)
 		char sArguments[64];
 		GetCmdArgString(sArguments, sizeof(sArguments));
 		
-		SendPrintAll("[SpewCommands] -{U}%N {D}: {U}%s {D}[{U}%s{D}]", client, sCommand, sArguments);
+		Vertex_SendPrintToAll("[SpewCommands] -[H]%N [D]: [H]%s [D][[H]%s[D]]", client, sCommand, sArguments);
 	}
 }
 
@@ -4096,7 +4063,7 @@ public Action Command_LoadPlugin(int client, int args)
 	GetCmdArgString(sName, sizeof(sName));
 	
 	ServerCommand("sm plugins load %s", sName);
-	SendPrint(client, "{U}%s {D}has been loaded.", sName);
+	Vertex_SendPrint(client, "[H]%s [D]has been loaded.", sName);
 	
 	return Plugin_Handled;
 }
@@ -4107,7 +4074,7 @@ public Action Command_ReloadPlugin(int client, int args)
 	GetCmdArgString(sName, sizeof(sName));
 	
 	ServerCommand("sm plugins reload %s", sName);
-	SendPrint(client, "{U}%s {D}has been reloaded.", sName);
+	Vertex_SendPrint(client, "[H]%s [D]has been reloaded.", sName);
 	
 	return Plugin_Handled;
 }
@@ -4118,13 +4085,13 @@ public Action Command_UnloadPlugin(int client, int args)
 	GetCmdArgString(sName, sizeof(sName));
 	
 	ServerCommand("sm plugins unload %s", sName);
-	SendPrint(client, "{U}%s {D}has been unloaded.", sName);
+	Vertex_SendPrint(client, "[H]%s [D]has been unloaded.", sName);
 	
 	return Plugin_Handled;
 }
 
 public Action Command_GetEntCount(int client, int args)
 {
-	SendPrint(client, "Total Networked Entities: {U}%i", GetEntityCount());
+	Vertex_SendPrint(client, "Total Networked Entities: [H]%i", GetEntityCount());
 	return Plugin_Handled;
 }

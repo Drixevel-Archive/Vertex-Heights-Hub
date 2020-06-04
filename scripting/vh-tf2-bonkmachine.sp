@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights][TF2] :: Bonk Machine"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 /*****************************/
@@ -24,6 +24,7 @@
 
 /*****************************/
 //Globals
+Database g_Database;
 bool g_Late;
 int g_VendingMachine;
 Handle g_HumTimer;
@@ -52,6 +53,9 @@ Secondary g_Secondary[MAXPLAYERS + 1];
 
 int g_BuyDelay[MAXPLAYERS + 1] = {-1, ...};
 
+float g_Origin[3];
+float g_Angles[3];
+
 /*****************************/
 //Plugin Info
 public Plugin myinfo = 
@@ -71,12 +75,74 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 
 public void OnPluginStart()
 {
+	Database.Connect(OnSQLConnect, "default");
 	g_HudSync = CreateHudSynchronizer();
+	RegAdminCmd("sm_bonkmachine", Command_BonkMachine, ADMFLAG_ROOT, "Sets the coordinates to spawn a bonk machine on the current map.");
+}
 
-	if (g_Late)
+public void OnSQLConnect(Database db, const char[] error, any data)
+{
+	if (db == null)
+		ThrowError("Error while connecting to database: %s", error);
+	
+	if (g_Database != null)
 	{
-		g_Late = false;
-		TF2_OnRoundStart(false);
+		delete db;
+		return;
+	}
+
+	g_Database = db;
+	LogMessage("Connected to database successfully.");
+
+	ParseSpawn();
+}
+
+void ParseSpawn()
+{
+	if (!IsValidEntity(0) || g_Database == null)
+		return;
+	
+	char sMap[64];
+	GetCurrentMap(sMap, sizeof(sMap));
+	GetMapDisplayName(sMap, sMap, sizeof(sMap));
+
+	char sQuery[256];
+	g_Database.Format(sQuery, sizeof(sQuery), "SELECT origin, angles FROM `bonkmachine_spawns` WHERE map = '%s';", sMap);
+	g_Database.Query(OnParseSpawn, sQuery);
+}
+
+public void OnParseSpawn(Database db, DBResultSet results, const char[] error, any data)
+{
+	if (results == null)
+		ThrowError("Error while parsing bonk machine spawnpoint: %s", error);
+	
+	if (results.FetchRow())
+	{
+		char sOrigin[64];
+		results.FetchString(0, sOrigin, sizeof(sOrigin));
+
+		char sPart[3][16];
+		ExplodeString(sOrigin, " ", sPart, 3, 16);
+
+		g_Origin[0] = StringToFloat(sPart[0]);
+		g_Origin[1] = StringToFloat(sPart[1]);
+		g_Origin[2] = StringToFloat(sPart[2]);
+
+		char sAngles[64];
+		results.FetchString(1, sAngles, sizeof(sAngles));
+
+		char sPart2[3][16];
+		ExplodeString(sAngles, " ", sPart2, 3, 16);
+
+		g_Angles[0] = StringToFloat(sPart2[0]);
+		g_Angles[1] = StringToFloat(sPart2[1]);
+		g_Angles[2] = StringToFloat(sPart2[2]);
+
+		if (g_Late)
+		{
+			g_Late = false;
+			TF2_OnRoundStart(false);
+		}
 	}
 }
 
@@ -116,16 +182,19 @@ public void OnMapEnd()
 
 public void TF2_OnRoundStart(bool full_reset)
 {
+	if (g_VendingMachine > 0 && IsValidEntity(g_VendingMachine))
+		AcceptEntityInput(g_VendingMachine, "Kill");
+	
 	g_VendingMachine = CreateEntityByName("prop_dynamic");
 
 	if (!IsValidEntity(g_VendingMachine))
 		return;
 	
+	DispatchKeyValueVector(g_VendingMachine, "origin", g_Origin);
+	DispatchKeyValueVector(g_VendingMachine, "angles", g_Angles);
 	DispatchKeyValue(g_VendingMachine, "model", "models/props/soda_machine.mdl");
 	DispatchKeyValue(g_VendingMachine, "solid", "6");
 	DispatchKeyValue(g_VendingMachine, "modelscale", "1.3");
-	DispatchKeyValueVector(g_VendingMachine, "origin", view_as<float>({484.97, 1474.36, 400.00}));
-	DispatchKeyValueVector(g_VendingMachine, "angles", view_as<float>({0.31, 179.74, 0.0}));
 
 	DispatchSpawn(g_VendingMachine);
 	TF2_CreateGlow("vending_machine_glow", g_VendingMachine, view_as<int>({255, 0, 255, 255}));
@@ -152,7 +221,6 @@ public void OnGameFrame()
 	{
 		if (!IsClientConnected(i) || !IsClientInGame(i) || !IsPlayerAlive(i) || GetClientTeam(i) < 2 || IsFakeClient(i))
 			continue;
-		
 		
 		if (GetEntitiesDistance(i, g_VendingMachine) < 100.0)
 		{
@@ -486,4 +554,44 @@ public void TF2_OnButtonPressPost(int client, int button)
 			pack.WriteCell(EntIndexToEntRef(bonk));
 		}
 	}
+}
+
+public Action Command_BonkMachine(int client, int args)
+{
+	if (client == 0)
+		return Plugin_Handled;
+	
+	if (g_Database == null)
+	{
+		PrintToChat(client, "Database is not connect to set the bonk machine spawnpoint.");
+		return Plugin_Handled;
+	}
+
+	GetClientAbsOrigin(client, g_Origin);
+	GetClientAbsAngles(client, g_Angles);
+
+	TF2_OnRoundStart(false);
+	PrintToChat(client, "Bonk machine moved to your position.");
+
+	char sMap[64];
+	GetCurrentMap(sMap, sizeof(sMap));
+	GetMapDisplayName(sMap, sMap, sizeof(sMap));
+
+	char sOrigin[64];
+	FormatEx(sOrigin, sizeof(sOrigin), "%.2f %.2f %.2f", g_Origin[0], g_Origin[1], g_Origin[2]);
+	
+	char sAngles[64];
+	FormatEx(sAngles, sizeof(sAngles), "%.2f %.2f %.2f", g_Angles[0], g_Angles[1], g_Angles[2]);
+
+	char sQuery[256];
+	g_Database.Format(sQuery, sizeof(sQuery), "INSERT INTO `bonkmachine_spawns` (map, origin, angles) VALUES ('%s', '%s', '%s') ON DUPLICATE KEY UPDATE origin = '%s', angles = '%s';", sMap, sOrigin, sAngles, sOrigin, sAngles);
+	g_Database.Query(OnSaveSpawn, sQuery);
+
+	return Plugin_Handled;
+}
+
+public void OnSaveSpawn(Database db, DBResultSet results, const char[] error, any data)
+{
+	if (results == null)
+		ThrowError("Error while saving bonk machine position: %s", error);
 }

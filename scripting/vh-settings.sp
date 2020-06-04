@@ -18,7 +18,9 @@
 #include <misc-colors>
 
 #include <vertexheights>
+#include <vh-core>
 #include <vh-settings>
+#include <vh-logs>
 
 /*****************************/
 //Globals
@@ -60,7 +62,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	RegPluginLibrary("vh-settings");
 
 	CreateNative("VH_RegisterSetting", Native_RegisterSetting);
-	CreateNative("VH_GetSettingValue", Native_GetSettingValue);
+	//CreateNative("VH_GetSettingValue", Native_GetSettingValue);
 
 	return APLRes_Success;
 }
