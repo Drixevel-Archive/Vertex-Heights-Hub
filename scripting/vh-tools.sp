@@ -6,7 +6,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Tools"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.3"
+#define PLUGIN_VERSION "1.0.4"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 //Includes
@@ -115,6 +115,8 @@ public void OnPluginStart()
 	g_Commands = new ArrayList(ByteCountToCells(128));
 	g_CommandFlags = new StringMap();
 	g_CachedTimes = new StringMap();
+
+	RegAdminCmd("sm_snoclip", Command_SilentNoclip, ADMFLAG_SLAY, "Noclip but without any indicators.");
 
 	RegAdminCmd("sm_tools", Command_Tools, ADMFLAG_SLAY, "List available commands under server tools.");
 	RegAdminCmd2("sm_restart", Command_Restart, ADMFLAG_ROOT, "Restart the server.");
@@ -460,6 +462,22 @@ public void OnClientDisconnect(int client)
 	
 	StopTimer(g_Timer[client]);
 	g_TimerVal[client] = 0.0;
+}
+
+public Action Command_SilentNoclip(int client, int args)
+{
+	if (IsClientServer(client))
+	{
+		Vertex_SendPrint(client, "You must be in-game to use this command.");
+		return Plugin_Handled;
+	}
+	
+	if (GetEntityMoveType(client) == MOVETYPE_NOCLIP)
+		SetEntityMoveType(client, MOVETYPE_WALK);
+	else
+		SetEntityMoveType(client, MOVETYPE_NOCLIP);
+	
+	return Plugin_Handled;
 }
 
 public Action Command_Tools(int client, int args)
@@ -4038,7 +4056,7 @@ public void OnTriggerTouch(int entity, int other)
 public Action Command_SpewCommands(int client, int args)
 {
 	g_SpewCommands = !g_SpewCommands;
-	Vertex_SendPrint(client, "Spew Commands Touched: [H]%s [D]", g_SpewCommands ? "ON" : "OFF");
+	Vertex_SendPrint(client, "Spew Commands Received: [H]%s [D]", g_SpewCommands ? "ON" : "OFF");
 	
 	return Plugin_Handled;
 }
