@@ -6,7 +6,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Tools"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.6"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 //Includes
@@ -375,7 +375,7 @@ public void OnAllPluginsLoaded()
 			EmitSoundToAll("ui/cyoa_map_open.wav");
 			ServerCommand("sm plugins reload %s", sReload);
 			
-			Vertex_SendPrintToAll("Plugin '[H]%s [D]' has been reloaded.", sName);
+			Vertex_SendPrintToAll("Plugin '[H]%s[D]' has been reloaded.", sName);
 			PrintToServer("Plugin '%s' has been reloaded.", sName);
 			
 			ServerCommand("sm_reload_translations %s", sReload); //Automatically reloads translations.

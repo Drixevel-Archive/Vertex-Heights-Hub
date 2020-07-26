@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Weblinks"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.0"
+#define PLUGIN_VERSION "1.0.1"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 /*****************************/
@@ -67,25 +67,44 @@ public void onSQLConnect(Database db, const char[] error, any data)
 
 public Action Command_Weblinks(int client, int args)
 {
-	Panel panel = new Panel();
-	panel.SetTitle("Available Weblinks:");
-
-	char sCommand[64];
-	for (int i = 0; i < g_Commands.Length; i++)
-	{
-		g_Commands.GetString(i, sCommand, sizeof(sCommand));
-		panel.DrawText(sCommand);
-	}
-
-	panel.Send(client, MenuHandler_Void, MENU_TIME_FOREVER);
-	delete panel;
-
+	OpenWeblinksMenu(client);
 	return Plugin_Handled;
 }
 
-public int MenuHandler_Void(Menu menu, MenuAction action, int param1, int param2)
+void OpenWeblinksMenu(int client)
 {
-	delete menu;
+	Menu menu = new Menu(MenuHandler_Weblinks);
+	menu.SetTitle("Available Weblinks:");
+
+	char sCommand[64]; char sURL[128];
+	for (int i = 0; i < g_Commands.Length; i++)
+	{
+		g_Commands.GetString(i, sCommand, sizeof(sCommand));
+		g_CommandURLs.GetString(sCommand, sURL, sizeof(sURL));
+		menu.AddItem(sURL, sCommand);
+	}
+
+	menu.Display(client, MENU_TIME_FOREVER);
+}
+
+public int MenuHandler_Weblinks(Menu menu, MenuAction action, int param1, int param2)
+{
+	switch (action)
+	{
+		case MenuAction_Select:
+		{
+			char sURL[128];
+			menu.GetItem(param2, sURL, sizeof(sURL));
+
+			if (strlen(sURL) > 0)
+				OpenWebsite(param1, sURL);
+
+			OpenWeblinksMenu(param1);
+		}
+
+		case MenuAction_End:
+			delete menu;
+	}
 }
 
 public Action Command_ReloadWebLinks(int client, int args)
@@ -117,9 +136,9 @@ public void onParseWebLinks(Database db, DBResultSet results, const char[] error
 	while (results.FetchRow())
 	{
 		results.FetchString(0, sCommand, sizeof(sCommand));
-		g_Commands.PushString(sCommand);
-
 		results.FetchString(1, sURL, sizeof(sURL));
+
+		g_Commands.PushString(sCommand);
 		g_CommandURLs.SetString(sCommand, sURL);
 
 		Format(sVariant, sizeof(sVariant), "!%s", sCommand);
@@ -128,6 +147,8 @@ public void onParseWebLinks(Database db, DBResultSet results, const char[] error
 		Format(sVariant, sizeof(sVariant), "/%s", sCommand);
 		g_CommandURLs.SetString(sVariant, sURL);
 	}
+
+	LogMessage("%i weblinks loaded.", g_Commands.Length);
 }
 
 public void OnClientSayCommand_Post(int client, const char[] command, const char[] sArgs)
@@ -143,6 +164,7 @@ public void OnClientSayCommand_Post(int client, const char[] command, const char
 
 void OpenWebsite(int client, const char[] url)
 {
+	Vertex_SendPrint(client, "Opening URL: {haunted}%s", url);
 	KeyValues kv = new KeyValues("data");
 	kv.SetString("title", "Vertex Heights");
 	kv.SetNum("type", MOTDPANEL_TYPE_URL);
