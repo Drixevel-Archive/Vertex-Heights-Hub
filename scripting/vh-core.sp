@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Core"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 /*****************************/
@@ -97,7 +97,7 @@ public void OnPluginStart()
 	
 	RegAdminCmd("sm_resyncall", Command_ResyncAll, ADMFLAG_ROOT, "Resync all players and their data.");
 
-	SteamWorks_SetGameDescription("Vertex Heights");
+	//SteamWorks_SetGameDescription("Vertex Heights");
 }
 
 public Action Command_Connect(int client, int args)
