@@ -6,7 +6,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Tools"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.6"
+#define PLUGIN_VERSION "1.0.7"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 //Includes
@@ -43,6 +43,8 @@ StringMap g_CachedTimes;
 
 int g_iAmmo[MAX_ENTITY_LIMIT + 1];
 int g_iClip[MAX_ENTITY_LIMIT + 1];
+
+bool g_Bunnyhopping[MAXPLAYERS + 1];
 
 TopMenu hTopMenu;
 bool g_SpewConditions;
@@ -220,6 +222,10 @@ public void OnPluginStart()
 	RegAdminCmd("sm_spawnhealthkit", Command_SpawnHealthkit, ADMFLAG_SLAY, "Spawns a healthkit where you're looking.");
 	RegAdminCmd2("sm_lock", Command_Lock, ADMFLAG_ROOT, "Lock the server to admins only.");
 	RegAdminCmd("sm_lockserver", Command_Lock, ADMFLAG_ROOT, "Lock the server to admins only.");
+	RegAdminCmd("sm_bhop", Command_Bhop, ADMFLAG_SLAY, "Toggles bunnyhopping for one or more players.");
+	RegAdminCmd("sm_bhopping", Command_Bhop, ADMFLAG_SLAY, "Toggles bunnyhopping for one or more players.");
+	RegAdminCmd("sm_bhophopping", Command_Bhop, ADMFLAG_SLAY, "Toggles bunnyhopping for one or more players.");
+	
 	RegAdminCmd2("sm_createprop", Command_CreateProp, ADMFLAG_ROOT, "Create a dynamic prop entity.");
 	RegAdminCmd2("sm_animateprop", Command_AnimateProp, ADMFLAG_ROOT, "Animate a dynamic prop entity.");
 	RegAdminCmd2("sm_deleteprop", Command_DeleteProp, ADMFLAG_ROOT, "Delete a dynamic prop entity.");
@@ -4112,4 +4118,46 @@ public Action Command_GetEntCount(int client, int args)
 {
 	Vertex_SendPrint(client, "Total Networked Entities: [H]%i", GetEntityCount());
 	return Plugin_Handled;
+}
+
+public Action Command_Bhop(int client, int args)
+{
+	char sTarget[MAX_TARGET_LENGTH];
+	GetCmdArg(1, sTarget, sizeof(sTarget));
+
+	int targets_list[MAXPLAYERS];
+	char sTargetName[MAX_TARGET_LENGTH];
+	bool tn_is_ml;
+
+	int targets = ProcessTargetString(sTarget, client, targets_list, sizeof(targets_list), COMMAND_FILTER_ALIVE, sTargetName, sizeof(sTargetName), tn_is_ml);
+
+	if (targets <= 0)
+	{
+		ReplyToTargetError(client, COMMAND_TARGET_NONE);
+		return Plugin_Handled;
+	}
+
+	bool status = GetCmdArgBool(2);
+
+	for (int i = 0; i < targets; i++)
+	{
+		g_Bunnyhopping[targets_list[i]] = status;
+		Vertex_SendPrint(targets_list[i], "[H]%N [D] has %s ability to bunnyhop.", client, status ? "given you the" : "took away your");
+	}
+	
+	if (tn_is_ml)
+		Vertex_SendPrint(client, "[H]%t [D]can %s bunnyhop.", sTargetName, status ? "now" : "no longer");
+	else
+		Vertex_SendPrint(client, "[H]%s [D]can %s bunnyhop.", sTargetName, status ? "now" : "no longer");
+	
+	return Plugin_Handled;
+}
+
+public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3], float angles[3], int &weapon, int &subtype, int &cmdnum, int &tickcount, int &seed, int mouse[2])
+{
+	if (g_Bunnyhopping[client] && (!(GetEntityFlags(client) & FL_FAKECLIENT) && buttons & IN_JUMP) && (GetEntityFlags(client) & FL_ONGROUND))
+	{
+		int nOldButtons = GetEntProp(client, Prop_Data, "m_nOldButtons");
+		SetEntProp(client, Prop_Data, "m_nOldButtons", (nOldButtons &= ~(IN_JUMP | IN_DUCK)));
+	}
 }
