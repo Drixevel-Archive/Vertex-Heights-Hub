@@ -9,7 +9,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Workshop"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 #define NO_COLLECTION -1
@@ -145,6 +145,17 @@ public void HttpResponseCallback(bool success, const char[] error, System2HTTPRe
 	}
 
 	FindConVar("mapcyclefile").SetString("mapcycle_workshop.txt");
+
 	mapcycle.Close();
 	delete vdf;
+
+	CreateTimer(2.0, Timer_ReloadMapPlugins);
+}
+
+public Action Timer_ReloadMapPlugins(Handle timer)
+{
+	ServerCommand("sm_rcon sm plugins reload basecommands");
+	ServerCommand("sm_rcon sm plugins reload mapchooser");
+	ServerCommand("sm_rcon sm plugins reload rockthevote");
+	ServerCommand("sm_rcon sm plugins reload nominations");
 }

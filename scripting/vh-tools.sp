@@ -89,6 +89,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	MarkNativeAsOptional("TF2Items_SetQuality");
 	MarkNativeAsOptional("TF2Items_SetLevel");
 	MarkNativeAsOptional("TF2Items_GiveNamedItem");
+	MarkNativeAsOptional("TF2Items_SetNumAttributes");
+	MarkNativeAsOptional("TF2Items_SetAttribute");
 	
 	return APLRes_Success;
 }
@@ -222,7 +224,7 @@ public void OnPluginStart()
 	RegAdminCmd("sm_spawnhealthkit", Command_SpawnHealthkit, ADMFLAG_SLAY, "Spawns a healthkit where you're looking.");
 	RegAdminCmd2("sm_lock", Command_Lock, ADMFLAG_ROOT, "Lock the server to admins only.");
 	RegAdminCmd("sm_lockserver", Command_Lock, ADMFLAG_ROOT, "Lock the server to admins only.");
-	RegAdminCmd("sm_bhop", Command_Bhop, ADMFLAG_SLAY, "Toggles bunnyhopping for one or more players.");
+	RegAdminCmd2("sm_bhop", Command_Bhop, ADMFLAG_SLAY, "Toggles bunnyhopping for one or more players.");
 	RegAdminCmd("sm_bhopping", Command_Bhop, ADMFLAG_SLAY, "Toggles bunnyhopping for one or more players.");
 	RegAdminCmd("sm_bhophopping", Command_Bhop, ADMFLAG_SLAY, "Toggles bunnyhopping for one or more players.");
 	
@@ -241,6 +243,7 @@ public void OnPluginStart()
 	RegAdminCmd2("sm_setentpropfloat", Command_SetEntPropFloat, ADMFLAG_ROOT, "Set an entity float property for entities.");
 	RegAdminCmd2("sm_getentclass", Command_GetEntClass, ADMFLAG_ROOT, "Gets an entities classname based on crosshair and displays it.");
 	RegAdminCmd2("sm_getentcount", Command_GetEntCount, ADMFLAG_ROOT, "Displays the current entity count.");
+	RegAdminCmd2("sm_killentity", Command_KillEntity, ADMFLAG_ROOT, "Kills the entity in your crosshair.");
 	
 	RegAdminCmd("sm_starttimer", Command_StartTimer, ADMFLAG_SLAY, "Start a timer for either yourself or the server to see.");
 	RegAdminCmd("sm_stoptimer", Command_Stoptimer, ADMFLAG_SLAY, "Stops a currently active timer on the server.");
@@ -3914,7 +3917,13 @@ public Action Command_RemoveAttribute(int client, int args)
 
 public Action Command_GetEntProp(int client, int args)
 {
-	int target = client;
+	int target = GetClientAimTarget(client, false);
+	
+	if (!IsValidEntity(target))
+	{
+		Vertex_SendPrint(client, "Entity not found, please aim your crosshair at the entity.");
+		return Plugin_Handled;
+	}
 	
 	PropType type = view_as<PropType>(GetCmdArgInt(1));
 	
@@ -3933,7 +3942,13 @@ public Action Command_GetEntProp(int client, int args)
 
 public Action Command_SetEntProp(int client, int args)
 {
-	int target = client;
+	int target = GetClientAimTarget(client, false);
+	
+	if (!IsValidEntity(target))
+	{
+		Vertex_SendPrint(client, "Entity not found, please aim your crosshair at the entity.");
+		return Plugin_Handled;
+	}
 	
 	PropType type = view_as<PropType>(GetCmdArgInt(1));
 	
@@ -3955,7 +3970,13 @@ public Action Command_SetEntProp(int client, int args)
 
 public Action Command_GetEntPropFloat(int client, int args)
 {
-	int target = client;
+	int target = GetClientAimTarget(client, false);
+	
+	if (!IsValidEntity(target))
+	{
+		Vertex_SendPrint(client, "Entity not found, please aim your crosshair at the entity.");
+		return Plugin_Handled;
+	}
 	
 	PropType type = view_as<PropType>(GetCmdArgInt(1));
 	
@@ -3974,7 +3995,13 @@ public Action Command_GetEntPropFloat(int client, int args)
 
 public Action Command_SetEntPropFloat(int client, int args)
 {
-	int target = client;
+	int target = GetClientAimTarget(client, false);
+	
+	if (!IsValidEntity(target))
+	{
+		Vertex_SendPrint(client, "Entity not found, please aim your crosshair at the entity.");
+		return Plugin_Handled;
+	}
 	
 	PropType type = view_as<PropType>(GetCmdArgInt(1));
 	
@@ -4160,4 +4187,23 @@ public Action OnPlayerRunCmd(int client, int &buttons, int &impulse, float vel[3
 		int nOldButtons = GetEntProp(client, Prop_Data, "m_nOldButtons");
 		SetEntProp(client, Prop_Data, "m_nOldButtons", (nOldButtons &= ~(IN_JUMP | IN_DUCK)));
 	}
+}
+
+public Action Command_KillEntity(int client, int args)
+{
+	int target = GetClientAimTarget(client, false);
+	
+	if (!IsValidEntity(target))
+	{
+		Vertex_SendPrint(client, "Entity not found, please aim your crosshair at the entity.");
+		return Plugin_Handled;
+	}
+	
+	char sClass[64];
+	GetEntityClassname(target, sClass, sizeof(sClass));
+
+	Vertex_SendPrint(client, "Entity [H]%i[D] with class class [H]%s[D] has been killed.", target, sClass);
+	AcceptEntityInput(target, "Kill");
+
+	return Plugin_Handled;
 }
