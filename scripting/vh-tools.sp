@@ -6,7 +6,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Tools"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.7"
+#define PLUGIN_VERSION "1.0.8"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 //Includes
@@ -160,8 +160,8 @@ public void OnPluginStart()
 	RegAdminCmd("sm_mag", Command_RefillClip, ADMFLAG_SLAY, "Refill your clip.");
 	RegAdminCmd("sm_refillmag", Command_RefillClip, ADMFLAG_SLAY, "Refill your clip.");
 	RegAdminCmd("sm_refillmagazine", Command_RefillClip, ADMFLAG_SLAY, "Refill your clip.");
-	RegAdminCmd2("sm_bots", Command_ManageBots, ADMFLAG_ROOT, "Manage bots on the server.");
-	RegAdminCmd("sm_managebots", Command_ManageBots, ADMFLAG_ROOT, "Manage bots on the server.");
+	RegAdminCmd2("sm_bots", Command_ManageBots, ADMFLAG_GENERIC, "Manage bots on the server.");
+	RegAdminCmd("sm_managebots", Command_ManageBots, ADMFLAG_GENERIC, "Manage bots on the server.");
 	RegAdminCmd2("sm_password", Command_Password, ADMFLAG_ROOT, "Set a password on the server or remove it.");
 	RegAdminCmd("sm_setpassword", Command_Password, ADMFLAG_ROOT, "Set a password on the server or remove it.");
 	RegAdminCmd2("sm_endround", Command_EndRound, ADMFLAG_ROOT, "Ends the current round.");
@@ -1484,7 +1484,7 @@ public int MenuHandler_ManageBots(Menu menu, MenuAction action, int param1, int 
 				}
 
 				Vertex_SendPrintToAll("[H]%N [D]has kicked the bot [H]%N [D].", param1, target);
-				ServerCommand("tf_bot_kick \"[H]%N [D]\"", target);
+				ServerCommand("tf_bot_kick \"%N \"", target);
 
 				OpenManageBotsMenu(param1);
 			}
@@ -1668,7 +1668,7 @@ public int MenuHandler_SetBotQuota(Menu menu, MenuAction action, int param1, int
 			char sInfo[12];
 			menu.GetItem(param2, sInfo, sizeof(sInfo));
 
-			ServerCommand("tf_bot_quota [H]%i [D]", StringToInt(sInfo));
+			ServerCommand("tf_bot_quota %i", StringToInt(sInfo));
 
 			OpenSetBotQuotaMenu(param1);
 		}
