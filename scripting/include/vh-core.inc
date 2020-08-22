@@ -11,6 +11,7 @@ native int VH_GetClientByVID(int vid);
 native int VH_GetServerID();
 native void VH_GetServerSecretKey(char[] buffer, int size);
 native int VH_GetServerData(const char[] key, char[] buffer = "", int size = 0);
+native bool VH_IsInSteamGroup(int client);
 
 forward void VH_OnHubOpen(int client, Menu menu);
 forward void VH_OnVIPFeatures(int client, Panel panel);
@@ -25,6 +26,8 @@ public void __pl_vh_core_SetNTVOptional()
 	MarkNativeAsOptional("VH_GetClientByVID");
 	MarkNativeAsOptional("VH_GetServerID");
 	MarkNativeAsOptional("VH_GetServerSecretKey");
+	MarkNativeAsOptional("VH_GetServerData");
+	MarkNativeAsOptional("VH_IsInSteamGroup");
 }
 #endif
 

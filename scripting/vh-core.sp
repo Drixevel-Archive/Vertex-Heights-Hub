@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Core"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.5"
+#define PLUGIN_VERSION "1.0.6"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 /*****************************/
@@ -37,6 +37,7 @@
 Database g_Database;
 
 int g_VertexID[MAXPLAYERS + 1] = {VH_NULLID, ...};
+bool g_IsInGroup[MAXPLAYERS + 1];
 
 enum struct Server
 {
@@ -76,6 +77,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("VH_GetServerSecretKey", Native_GetServerSecretKey);
 	CreateNative("VH_Resync", Native_Resync);
 	CreateNative("VH_GetServerData", Native_GetServerData);
+	CreateNative("VH_IsInSteamGroup", Native_IsInSteamgroup);
 
 	g_Forward_Hub = CreateGlobalForward("VH_OnHubOpen", ET_Ignore, Param_Cell, Param_Cell);
 	g_Forward_VIPPanel = CreateGlobalForward("VH_OnVIPFeatures", ET_Ignore, Param_Cell, Param_Cell);
@@ -400,6 +402,44 @@ public void onSyncID(Database db, DBResultSet results, const char[] error, any d
 	int client;
 	if ((client = GetClientOfUserId(data)) > 0)
 		SyncForward(client, results.InsertId);
+}
+
+public void OnClientPostAdminCheck(int client)
+{
+	g_IsInGroup[client] = false;
+
+	if (!SteamWorks_GetUserGroupStatus(client, 34551207))
+		LogError("Error while pulling group information for: %N", client);
+}
+
+public void SteamWorks_OnClientGroupStatus(int authid, int groupid, bool isMember, bool isOfficer)
+{
+	int client = UserAuthGrab(authid);
+
+	if (client > 0 && isMember)
+		g_IsInGroup[client] = true;
+}
+
+int UserAuthGrab(int authid)
+{
+	char authchar[64];
+	IntToString(authid, authchar, sizeof(authchar));
+
+	char charauth[64];
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || !GetClientAuthId(i, AuthId_Steam3, charauth, sizeof(charauth)) || StrContains(charauth, authchar) == -1)
+			continue;
+		
+		return i;
+	}
+	
+	return 0;
+}
+
+public int Native_IsInSteamgroup(Handle plugin, int numParams)
+{
+	return g_IsInGroup[GetNativeCell(1)];
 }
 
 public void OnClientDisconnect_Post(int client)
