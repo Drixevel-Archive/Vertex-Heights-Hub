@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Store"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.4"
+#define PLUGIN_VERSION "1.0.5"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 #define TYPE_SHOP 1
@@ -658,14 +658,14 @@ public Action Timer_GiveCredits(Handle timer)
 		
 		credits = GetRandomInt(4, 6) + ((VH_GetAdmGroup(i) != VH_NULLADMGRP) ? 2 : 0);
 
-		if (SteamWorks_GetUserGroupStatus(i, 34551207))
+		if (VH_IsInSteamGroup(i))
 		{
 			credits += 2;
 			ingroup = true;
 		}
 		
 		g_Player[i].AddCredits(credits);
-		Vertex_SendPrint(i, "You have gained [H]%i [D]credits for playing on the server.%s", credits, ingroup ? " (+2 for being in Steamgroup" : "");
+		Vertex_SendPrint(i, "You have gained [H]%i [D]credits for playing on the server.%s", credits, ingroup ? " (+2 for being in Steamgroup)" : "");
 	}
 }
 
