@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: VIP"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 /*****************************/
@@ -46,6 +46,21 @@ public void VH_OnVIPFeatures(int client, Panel panel)
 
 public void VH_OnPermissionsParsed(int client, int admgroup)
 {
-	if (GetClientCount(false) >= (MaxClients - 3) && !IsVIP(client))
+	if (GetRealPlayerCount() >= (MaxClients - 3) && !IsVIP(client))
 		KickClient(client, "You cannot take up an admin slot.");
+}
+
+int GetRealPlayerCount()
+{
+	int count;
+
+	for (int i = 1; i <= MaxClients; i++)
+	{
+		if (!IsClientInGame(i) || IsClientSourceTV(i) || IsFakeClient(i))
+			continue;
+
+		count++;
+	}
+
+	return count;
 }
