@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Store"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.5"
+#define PLUGIN_VERSION "1.0.7"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 #define TYPE_SHOP 1
@@ -669,6 +669,11 @@ public Action Timer_GiveCredits(Handle timer)
 	}
 }
 
+public void VH_OnVIPFeatures(int client, Panel panel)
+{
+	panel.DrawText(" * Extra Credits Gained");
+}
+
 public void onSQLConnect(Database db, const char[] error, any data)
 {
 	if (db == null)
@@ -693,7 +698,7 @@ public void onSQLConnect(Database db, const char[] error, any data)
 
 void ParseCategories()
 {
-	g_Database.Query(onParseCategories, "SELECT * FROM `store_categories`;");
+	g_Database.Query(onParseCategories, "SELECT * FROM `store_categories` WHERE hidden = 0;");
 }
 
 public void onParseCategories(Database db, DBResultSet results, const char[] error, any data)
@@ -721,7 +726,7 @@ public void onParseCategories(Database db, DBResultSet results, const char[] err
 
 void ParseItems()
 {
-	g_Database.Query(onParseItems, "SELECT * FROM `store_items`;");
+	g_Database.Query(onParseItems, "SELECT * FROM `store_items` WHERE hidden = 0;");
 }
 
 public void onParseItems(Database db, DBResultSet results, const char[] error, any data)
