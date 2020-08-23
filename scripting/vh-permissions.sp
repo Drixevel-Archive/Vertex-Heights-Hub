@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Permissions"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.1"
+#define PLUGIN_VERSION "1.0.2"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 #define FLAG_LETTERS_SIZE 26
@@ -137,20 +137,20 @@ public void OnPluginStart()
 
 public void VH_OnHubOpen(int client, Menu menu)
 {
-	if (IsDrixevel(client) || g_Group[client] == 1)
+	if (g_Group[client] == 2)
 	{
 		menu.AddItem("vip", "VIP Only Menu", ITEMDRAW_DISABLED);
 		menu.AddItem("bans", "Manage Bans");
 		menu.AddItem("permissions", "Manage Permissions");
 	}
 	
-	if (g_Group[client] == 2)
+	if (g_Group[client] == 3)
 	{
 		menu.AddItem("vip", "VIP Only Menu", ITEMDRAW_DISABLED);
 		menu.AddItem("bans", "Manage Bans");
 	}
 
-	if (g_Group[client] == 3 || g_Group[client] == 4)
+	if (g_Group[client] == 4 || g_Group[client] == 5)
 		menu.AddItem("vip", "VIP Only Menu", ITEMDRAW_DISABLED);
 }
 
@@ -221,9 +221,6 @@ public Action Command_Permissions(int client, int args)
 							
 		char sGroup[64];
 		g_GroupNames.GetString(sID, sGroup, sizeof(sGroup));
-
-		if (IsDrixevel(target))
-			strcopy(sGroup, sizeof(sGroup), "Developer");
 
 		Vertex_SendPrint(client, "%N's current permissions group is: [H]%s", target, sGroup);
 
@@ -399,7 +396,7 @@ void OpenPlayersMenu(int client, int type, bool back = true)
 	char sVID[16]; char sName[MAX_NAME_LENGTH];
 	for (int i = 1; i <= MaxClients; i++)
 	{
-		if (!IsClientInGame(i) || IsFakeClient(i) || !CanUserTarget(client, i) || IsDrixevel(i))
+		if (!IsClientInGame(i) || IsFakeClient(i) || !CanUserTarget(client, i))
 			continue;
 		
 		switch (type)
@@ -797,7 +794,7 @@ public void VH_OnSynced(int client, int vid)
 	g_Group[client] = VH_NULLADMGRP;
 	g_GroupID[client] = INVALID_GROUP_ID;
 
-	if (IsFakeClient(client) || g_Database == null || IsDrixevel(client))
+	if (IsFakeClient(client) || g_Database == null)
 		return;
 	
 	char auth[64];
@@ -861,9 +858,6 @@ public void onParseGroup(Database db, DBResultSet results, const char[] error, D
 
 void SetPlayerGroup(int client, const char[] auth)
 {
-	if (IsDrixevel(client))
-		return;
-	
 	AdminId adm = INVALID_ADMIN_ID;
 	if ((adm = FindAdminByIdentity(AUTHMETHOD_STEAM, auth)) != INVALID_ADMIN_ID)
 		RemoveAdmin(adm);

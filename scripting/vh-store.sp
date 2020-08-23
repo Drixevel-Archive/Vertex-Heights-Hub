@@ -8,7 +8,7 @@
 #define PLUGIN_NAME "[Vertex Heights] :: Store"
 #define PLUGIN_AUTHOR "Drixevel"
 #define PLUGIN_DESCRIPTION ""
-#define PLUGIN_VERSION "1.0.7"
+#define PLUGIN_VERSION "1.0.8"
 #define PLUGIN_URL "https://vertexheights.com/"
 
 #define TYPE_SHOP 1
@@ -603,6 +603,9 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	CreateNative("VH_OpenShopMenu", Native_OpenShopMenu);
 	CreateNative("VH_OpenInventoryMenu", Native_OpenInventoryMenu);
 
+	CreateNative("VH_GetEquipped", Native_GetEquipped);
+	CreateNative("VH_GetItemData", Native_GetItemData);
+
 	g_Forward_OnItemPurchase = CreateGlobalForward("VH_OnItemPurchase", ET_Event, Param_Cell, Param_Cell, Param_Cell);
 	g_Forward_OnItemPurchased = CreateGlobalForward("VH_OnItemPurchased", ET_Ignore, Param_Cell, Param_Cell, Param_Cell);
 	g_Forward_OnItemGive = CreateGlobalForward("VH_OnItemGive", ET_Event, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
@@ -611,6 +614,62 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
 	g_Forward_OnItemEquipped = CreateGlobalForward("VH_OnItemEquipped", ET_Ignore, Param_Cell, Param_Cell, Param_Cell, Param_Cell);
 
 	return APLRes_Success;
+}
+
+public int Native_GetEquipped(Handle plugin, int numParams)
+{
+	int client = GetNativeCell(1);
+
+	int size;
+	GetNativeStringLength(2, size); size++;
+
+	char[] sCategory = new char[size];
+	GetNativeString(2, sCategory, size);
+
+	int index = GetNativeCell(3);
+
+	int class = GetEntProp(client, Prop_Send, "m_iClass");
+
+	int wepindex = -1; int weapon = -1;
+	if ((weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon")) != -1)
+		wepindex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+
+	int id = GetCategoryByName(sCategory);
+	int category = GetCategoryIndexById(id);
+	int max = g_Categories[category].max_equipped;
+
+	int[] equipped = new int[max];
+	g_Player[client].GetEquippedByCategoryId(id, equipped, max, class, wepindex);
+	
+	if (equipped[index] == -1)
+		return false;
+	
+	int item = -1;
+	if ((item = GetItemIndexById(equipped[index])) == -1)
+		return false;
+	
+	SetNativeString(4, g_Items[item].name, GetNativeCell(5));
+	return true;
+}
+
+public int Native_GetItemData(Handle plugin, int numParams)
+{
+	int size;
+	GetNativeStringLength(1, size); size++;
+
+	char[] sItem = new char[size];
+	GetNativeString(1, sItem, size);
+
+	for (int i = 0; i < g_TotalItems; i++)
+	{
+		if (!StrEqual(sItem, g_Items[i].name, false))
+			continue;
+		
+		SetNativeString(2, g_Items[i].data, GetNativeCell(3));
+		return true;
+	}
+
+	return false;
 }
 
 public void OnPluginStart()
@@ -1633,91 +1692,6 @@ public Action Command_RemoveCredits(int client, int args)
 		Vertex_SendPrint(client, "You have removed [H]%i[D] credits from [H]%s[D].", value, sTargetName);
 
 	return Plugin_Handled;
-}
-
-public Action CP_OnChatMessage(int& author, ArrayList recipients, char[] flagstring, char[] name, char[] message, bool & processcolors, bool & removecolors)
-{
-	int class = GetEntProp(author, Prop_Send, "m_iClass");
-
-	int wepindex = -1; int weapon = -1;
-	if ((weapon = GetEntPropEnt(author, Prop_Send, "m_hActiveWeapon")) != -1)
-		wepindex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
-
-	bool changed;
-	int id;
-	int index;
-	int max;
-
-	id = GetCategoryByName("Chat Tags");
-	index = GetCategoryIndexById(id);
-	max = g_Categories[index].max_equipped;
-
-	int[] tag = new int[max];
-	g_Player[author].GetEquippedByCategoryId(id, tag, max, class, wepindex);
-
-	id = GetCategoryByName("Tag Colors");
-	index = GetCategoryIndexById(id);
-	max = g_Categories[index].max_equipped;
-
-	int[] tagcolor = new int[max];
-	g_Player[author].GetEquippedByCategoryId(id, tagcolor, max, class, wepindex);
-
-	id = GetCategoryByName("Name Colors");
-	index = GetCategoryIndexById(id);
-	max = g_Categories[index].max_equipped;
-
-	int[] namecolor = new int[max];
-	g_Player[author].GetEquippedByCategoryId(id, namecolor, max, class, wepindex);
-
-	id = GetCategoryByName("Chat Colors");
-	index = GetCategoryIndexById(id);
-	max = g_Categories[index].max_equipped;
-
-	int[] chatcolor = new int[max];
-	g_Player[author].GetEquippedByCategoryId(id, chatcolor, max);
-
-	if (tag[0] != -1)
-	{
-		index = GetItemIndexById(tag[0]);
-
-		if (index != -1)
-		{
-			int index2 = -1;
-			if (tagcolor[0] != -1)
-				index2 = GetItemIndexById(tagcolor[0]);
-
-			int index3 = -1;
-			if (namecolor[0] != -1)
-				index3 = GetItemIndexById(namecolor[0]);
-			if (index3 || index2) {}
-
-			//Format(name, MAXLENGTH_NAME, "%s%s%s%s", (index2 != -1) ? g_Items[index2].data : "", g_Items[index].data, (index3 != -1) ? g_Items[index3].data : "", name);
-			changed = true;
-		}
-	}
-	else if (namecolor[0] != -1)
-	{
-		index = GetItemIndexById(namecolor[0]);
-
-		if (index != -1)
-		{
-			Format(name, MAXLENGTH_NAME, "%s%s", g_Items[index].data, name);
-			changed = true;
-		}
-	}
-
-	if (chatcolor[0] != -1)
-	{
-		index = GetItemIndexById(chatcolor[0]);
-
-		if (index != -1)
-		{
-			Format(message, MAXLENGTH_MESSAGE, "%s%s", g_Items[index].data, message);
-			changed = true;
-		}
-	}
-
-	return changed ? Plugin_Changed : Plugin_Continue;
 }
 
 public Action Command_Credits(int client, int args)

@@ -13,6 +13,9 @@ native void VH_OpenStoreMenu(int client);
 native void VH_OpenShopMenu(int client);
 native void VH_OpenInventoryMenu(int client);
 
+native bool VH_GetEquipped(int client, const char[] category, int slot, char[] item, int size);
+native bool VH_GetItemData(const char[] item, char[] data, int size);
+
 forward Action VH_OnItemPurchase(int client, int categoryid, int itemid);
 forward void VH_OnItemPurchased(int client, int categoryid, int itemid);
 forward Action VH_OnItemGive(int client, int categoryid, int itemid, int giver);
@@ -29,6 +32,12 @@ public void __pl_vh_store_SetNTVOptional()
 	MarkNativeAsOptional("VH_RemoveCredits");
 	MarkNativeAsOptional("VH_PurchaseItem");
 	MarkNativeAsOptional("VH_GiveItem");
+	MarkNativeAsOptional("VH_OpenStoreMenu");
+	MarkNativeAsOptional("VH_OpenShopMenu");
+	MarkNativeAsOptional("VH_OpenInventoryMenu");
+
+	MarkNativeAsOptional("VH_GetEquipped");
+	MarkNativeAsOptional("VH_GetItemData");
 }
 #endif
 
